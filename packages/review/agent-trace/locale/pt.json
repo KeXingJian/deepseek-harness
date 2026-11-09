@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Rastreamento de atividade do agente",
+    "description": "Agrega incrementalmente a atividade do agente de uma sessão e a armazena com limites, sem interface nem entrada de modelo."
+  }
+}

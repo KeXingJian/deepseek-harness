@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/review/agent-trace/README.md
+/:
+  en: 08a12d75573d1656
+  zh: 3d51c38dd6ebc761
+/deepseek-ai-dsh-agent-trace:
+  en: 0260b220212ab976
+  zh: a526007f3a8c6be3
+/deepseek-ai-dsh-agent-trace/summary:
+  en: 40e258765e741774
+  zh: 59ffaa467b29e6f4
+/deepseek-ai-dsh-agent-trace/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 405b30feaf48c087
+/deepseek-ai-dsh-agent-trace/use-this-package:
+  en: d622cc88042e6ed6
+  zh: 53e62ef8204392e7
+/deepseek-ai-dsh-agent-trace/use-this-package/configuration:
+  en: 75fb73e5f906ffd8
+  zh: c89444f48c1f55df
+/deepseek-ai-dsh-agent-trace/use-this-package/reading-values:
+  en: ddc5f691c4923596
+  zh: 5feddd459a0fdf88
+/deepseek-ai-dsh-agent-trace/use-this-package/writes-and-retention:
+  en: 3f75dfc867ee37e7
+  zh: 1674d1b6121897ad
+/deepseek-ai-dsh-agent-trace/understand-the-implementation:
+  en: 428fdeb9912f715e
+  zh: e7d2417b33b76f30
+/deepseek-ai-dsh-agent-trace/further-exploration:
+  en: 1dd9abbd420a41a0
+  zh: 8ae148966a0ef901
+/deepseek-ai-dsh-agent-trace/model-experience:
+  en: ffcc088c8e91c9aa
+  zh: 1019674e7e9c567a
+/deepseek-ai-dsh-agent-trace/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: 4fd78cfe2f71d092
+/deepseek-ai-dsh-agent-trace/known-limitations-and-deferred-work:
+  en: bdb5367378752c83
+  zh: 10aebde7a67c5e65
+/deepseek-ai-dsh-agent-trace/known-limitations-and-deferred-work/dev-note:
+  en: e1231aaf12ba7a9d
+  zh: 280e35eb6cd3bbe3

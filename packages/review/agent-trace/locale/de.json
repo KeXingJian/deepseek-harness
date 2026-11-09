@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Agent-Aktivitätsprotokoll",
+    "description": "Aggregiert die Agent-Aktivität einer Sitzung inkrementell und speichert sie begrenzt, ohne Oberfläche oder Modelleingabe."
+  }
+}

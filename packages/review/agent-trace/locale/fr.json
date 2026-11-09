@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Trace d’activité de l’agent",
+    "description": "Agrège de façon incrémentale l’activité de l’agent d’une session et la conserve avec des limites, sans interface ni entrée de modèle."
+  }
+}

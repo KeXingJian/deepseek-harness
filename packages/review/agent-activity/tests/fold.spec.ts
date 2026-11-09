@@ -3,7 +3,7 @@ import { createAssistantMessage, createToolResultMessage, ToolCallId } from '@de
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { applyActivityEvent, chainFromSpans, createActivityFolder, foldActivity } from '../src/index.ts'
+import { applyActivityEvent, chainFromSpans, createActivityFolder, foldActivity, initActivityState } from '../src/index.ts'
 
 /** Build a `turn/start` event. */
 function turnStart(seq: number, time: number, turn: number): SessionEvent {
@@ -94,19 +94,14 @@ function toolResult(seq: number, time: number, callId = 'call-1', isError = fals
 }
 
 describe('foldActivity', () => {
-  it('closes a tool span that carries no attributes yet', () => {
-    const state = {
-      spans: [{ seq: 1, kind: 'tool' as const, name: 'bash', startTime: 0, status: 'running' as const }],
-      openTurns: {},
-      openSteps: {},
-      openCalls: { 'call-1': 0 },
-    }
+  it('keeps the recorded call identity when a result adds no attributes', () => {
+    const state = applyActivityEvent(initActivityState(), toolCall(1, 0, 'bash', {}))
     const next = applyActivityEvent(state, toolResult(2, 30, 'call-1', true, 'FAILED'))
-    expect(next.spans[0]).toMatchObject({ status: 'error', attributes: { errorCode: 'FAILED' } })
+    expect(next.spans[0]).toMatchObject({ status: 'error', attributes: { callId: 'call-1', errorCode: 'FAILED' } })
 
     const plain = applyActivityEvent(state, toolResult(3, 40))
     expect(plain.spans[0]).toMatchObject({ status: 'ok' })
-    expect(plain.spans[0]?.attributes).toBeUndefined()
+    expect(plain.spans[0]?.attributes).toEqual({ callId: 'call-1' })
   })
 
   it('exposes running spans between applied events', () => {

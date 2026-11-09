@@ -199,6 +199,17 @@
         writeEveryEvents: 200
         writeIntervalMs: 5000
 
+    # Review trace collection: incremental span counters with a bounded,
+    # schema-validated summary for a future full-trace view. Silent by design:
+    # no UI, tool, model input, or Session event reads this data.
+    - id: agent-trace
+      name: '@deepseek-ai/dsh-agent-trace'
+      config:
+        flushEveryEvents: 200
+        flushIntervalMs: 5000
+        retentionDays: 30
+        maxRecords: 500
+
     - id: otel
       name: '@deepseek-ai/dsh-otel'
 

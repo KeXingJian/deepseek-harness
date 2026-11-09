@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Traza de actividad del agente",
+    "description": "Agrega de forma incremental la actividad del agente de una sesión y la guarda con límites, sin exponer interfaz ni entrada del modelo."
+  }
+}

@@ -78,3 +78,13 @@ export interface ChainResult {
   /** Risk flags ordered by severity. */
   readonly flags: readonly RiskFlag[]
 }
+
+/** Whole-log counters derived from spans, carried incrementally by the fold. */
+export interface ActivitySummary {
+  /** Opening counts by span family. */
+  readonly spansByKind: Readonly<Record<ActivitySpan['kind'], number>>
+  /** Current settlement counts; `running` counts spans still open. */
+  readonly spansByStatus: Readonly<Record<ActivitySpan['status'], number>>
+  /** Summed wall time of settled spans by family, in milliseconds. */
+  readonly durationByKind: Readonly<Record<ActivitySpan['kind'], number>>
+}

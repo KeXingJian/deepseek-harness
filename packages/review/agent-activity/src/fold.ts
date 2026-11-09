@@ -5,7 +5,8 @@
  */
 
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types'
-import type { ActivitySpan } from './types.ts'
+import { emptyActivitySummary, openActivitySpan, settleActivitySpan } from './aggregate.ts'
+import type { ActivitySpan, ActivitySummary } from './types.ts'
 
 /** Attributes a span accepts while it is being built. */
 type MutableAttributes = Record<string, string | number | boolean>
@@ -25,6 +26,8 @@ export interface ActivityState {
   openSteps: Record<string, number>
   /** Running tool call id to span index. */
   openCalls: Record<string, number>
+  /** Whole-log counters advanced by the same open/close transitions. */
+  summary: ActivitySummary
 }
 
 /** Argument keys a review chain reads. */
@@ -85,10 +88,19 @@ function intentOf(content: readonly { type: string; text?: string }[]): string |
 }
 
 /** Replace one span, preserving every other span reference. */
-function closed(state: ActivityState, index: number, span: ActivitySpan): ActivityState {
+function closed(state: ActivityState, index: number, previous: ActivitySpan, span: ActivitySpan): ActivityState {
   const spans = [...state.spans]
   spans[index] = span
-  return { ...state, spans }
+  return { ...state, spans, summary: settleActivitySpan(state.summary, previous, span) }
+}
+
+/** Append one opening span and account it once. */
+function opened(state: ActivityState, span: ActivitySpan): ActivityState {
+  return {
+    ...state,
+    spans: [...state.spans, span],
+    summary: openActivitySpan(state.summary, span),
+  }
 }
 
 /** Drop one owner key from a record. */
@@ -105,7 +117,7 @@ function released(record: Record<string, number>, key: string): Record<string, n
  * @returns state with no spans and no open owners.
  */
 export function initActivityState(): ActivityState {
-  return { spans: [], openTurns: {}, openSteps: {}, openCalls: {} }
+  return { spans: [], openTurns: {}, openSteps: {}, openCalls: {}, summary: emptyActivitySummary() }
 }
 
 /**
@@ -124,11 +136,8 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
         startTime: event.time,
         status: 'running',
       }
-      return {
-        ...state,
-        spans: [...state.spans, span],
-        openTurns: { ...state.openTurns, [String(event.data.turn)]: state.spans.length },
-      }
+      const next = opened(state, span)
+      return { ...next, openTurns: { ...next.openTurns, [String(event.data.turn)]: state.spans.length } }
     }
     case 'turn/end': {
       const key = String(event.data.turn)
@@ -136,7 +145,7 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
       const span = index === undefined ? undefined : state.spans[index]
       if (index === undefined || span === undefined) return state
       return {
-        ...closed(state, index, { ...span, endTime: event.time, status: statusOf(event.data.reason) }),
+        ...closed(state, index, span, { ...span, endTime: event.time, status: statusOf(event.data.reason) }),
         openTurns: released(state.openTurns, key),
       }
     }
@@ -149,11 +158,8 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
         startTime: event.time,
         status: 'running',
       }
-      return {
-        ...state,
-        spans: [...state.spans, span],
-        openSteps: { ...state.openSteps, [key]: state.spans.length },
-      }
+      const next = opened(state, span)
+      return { ...next, openSteps: { ...next.openSteps, [key]: state.spans.length } }
     }
     case 'step/end': {
       const key = `${String(event.data.turn)}:${String(event.data.step)}`
@@ -161,7 +167,7 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
       const span = index === undefined ? undefined : state.spans[index]
       if (index === undefined || span === undefined) return state
       return {
-        ...closed(state, index, { ...span, endTime: event.time, status: 'ok' }),
+        ...closed(state, index, span, { ...span, endTime: event.time, status: 'ok' }),
         openSteps: released(state.openSteps, key),
       }
     }
@@ -171,7 +177,7 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
       if (index === undefined || span === undefined || span.attributes?.intent !== undefined) return state
       const intent = intentOf(event.data.message.content)
       if (intent === undefined) return state
-      return closed(state, index, { ...span, attributes: { ...span.attributes, intent } })
+      return closed(state, index, span, { ...span, attributes: { ...span.attributes, intent } })
     }
     case 'tool/call': {
       const attributes = attributesOf(event.data.arguments)
@@ -194,11 +200,8 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
         status: 'running',
         attributes,
       }
-      return {
-        ...state,
-        spans: [...state.spans, span],
-        openCalls: { ...state.openCalls, [String(event.data.callId)]: state.spans.length },
-      }
+      const next = opened(state, span)
+      return { ...next, openCalls: { ...next.openCalls, [String(event.data.callId)]: state.spans.length } }
     }
     case 'tool/result': {
       const key = String(event.data.message.toolCallId)
@@ -209,11 +212,11 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
         ? span.attributes
         : { ...span.attributes, errorCode: event.data.error.code }
       return {
-        ...closed(state, index, {
+        ...closed(state, index, span, {
           ...span,
           endTime: event.time,
           status: event.data.message.isError === true ? 'error' : 'ok',
-          ...(attributes === undefined ? {} : { attributes }),
+          attributes,
         }),
         openCalls: released(state.openCalls, key),
       }

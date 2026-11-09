@@ -218,6 +218,33 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-tool-presentation -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-trace -->
+<a id="deepseek-aidsh-agent-trace"></a>
+
+## `@deepseek-ai/dsh-agent-trace`
+
+- `inject`: `sessions` · `storageDomain`
+- `source`: [`packages/review/agent-trace/src/index.ts:42`](../packages/review/agent-trace/src/index.ts)
+
+```ts config-catalog
+/**
+ * Plugin config. Every field is a deployment choice with no universally
+ * correct value: write cadence bounds how much work a crash can lose, and the
+ * retention pair bounds how much storage the silent collection may occupy.
+ */
+export interface Config {
+  /** Recorded events per Session that force a summary write between mandatory points. */
+  flushEveryEvents: number
+  /** Longest time (milliseconds) a dirty summary may stay unwritten between mandatory points. */
+  flushIntervalMs: number
+  /** Age (days) after which a stored summary is pruned on the next collection write. */
+  retentionDays: number
+  /** Maximum stored summaries; the oldest are pruned beyond this count. */
+  maxRecords: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-trace -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-api-gateway -->
 <a id="deepseek-aidsh-api-gateway"></a>
 
@@ -4906,6 +4933,7 @@ export interface Config {
 | `@deepseek-ai/dsh-client-modules` | `loader` | [`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts) |
 | `@deepseek-ai/dsh-client-resources` | — | [`packages/client/resources/src/index.ts`](../packages/client/resources/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-action-cards` | — | [`packages/experimental/client-ui-action-cards/src/index.ts`](../packages/experimental/client-ui-action-cards/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-agent-chain` | — | [`packages/client/ui-agent-chain/src/index.ts`](../packages/client/ui-agent-chain/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | — | [`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-agent-team` | — | [`packages/client/ui-agent-team/src/index.ts`](../packages/client/ui-agent-team/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-approval` | — | [`packages/client/ui-approval/src/index.ts`](../packages/client/ui-approval/src/index.ts) |
@@ -5047,6 +5075,7 @@ export interface Config {
 <!-- BEGIN GENERATED config-catalog:library -->
 | `package` | `inject` | `source` |
 | --- | --- | --- |
+| `@deepseek-ai/dsh-agent-activity` | — | [`packages/review/agent-activity/src/index.ts`](../packages/review/agent-activity/src/index.ts) |
 | `@deepseek-ai/dsh-agent-loop-testkit` | — | [`packages/test-support/agent-loop-testkit/src/index.ts`](../packages/test-support/agent-loop-testkit/src/index.ts) |
 | `@deepseek-ai/dsh-anonymous-user-id` | — | [`packages/identity/anonymous-user-id/src/index.ts`](../packages/identity/anonymous-user-id/src/index.ts) |
 | `@deepseek-ai/dsh-app-boot` | — | [`packages/boot/app-boot/src/index.ts`](../packages/boot/app-boot/src/index.ts) |
