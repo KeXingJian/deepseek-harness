@@ -16,11 +16,11 @@ export interface ActivitySpan {
   /** Epoch milliseconds at which the span opened. */
   readonly startTime: number
   /** Epoch milliseconds at which the span closed; absent while it runs. */
-  readonly endTime?: number
+  readonly endTime?: number | undefined
   /** Settlement state of the span. */
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
   /** Presentation facts the collection layer attached to this span. */
-  readonly attributes?: Readonly<Record<string, string | number | boolean>>
+  readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined
 }
 
 /** The six card kinds a review reader can see. */
@@ -38,7 +38,7 @@ export interface ChainCard {
   /** One-line summary shown without expansion. */
   readonly title: string
   /** Expansion-only text. */
-  readonly detail?: string
+  readonly detail?: string | undefined
   /** Epoch milliseconds at which the card opened. */
   readonly startedAt: number
   /** Visual state derived from the underlying spans and risk flags. */
@@ -46,9 +46,9 @@ export interface ChainCard {
   /** Sequence numbers a reader can open to check the card. */
   readonly evidenceSeqs: readonly number[]
   /** Number of merged occurrences, for repeated work on one target. */
-  readonly repeat?: number
+  readonly repeat?: number | undefined
   /** Machine facts the presentation layer can read without parsing titles. */
-  readonly meta?: Readonly<Record<string, string | number>>
+  readonly meta?: Readonly<Record<string, string | number>> | undefined
 }
 
 /** Severity of a review risk flag. */

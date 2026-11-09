@@ -1,0 +1,238 @@
+/* Review-chain view: a readable column of cards inside the conversation
+   scrollport. The parent scrolls, so this root keeps normal flow (no internal
+   scrollport, no fixed height) and only bounds its width to the transcript. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: var(--dsh-chat-content-width, 920px);
+  margin: 0 auto;
+  padding: 16px 24px 24px;
+  gap: 12px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.risks {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.risksHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.riskCount {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.riskList {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0 0;
+  padding: 0;
+  gap: 6px;
+  list-style: none;
+}
+
+.riskItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
+  gap: 4px 6px;
+  font: var(--dsw-font-xs-13);
+}
+
+.riskReason {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-primary);
+}
+
+.riskFiles {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  list-style: none;
+}
+
+.card {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--dsw-radius-md);
+}
+
+@media (hover: hover) {
+  .card:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.kind {
+  flex: none;
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+}
+
+.card[data-status='error'] .title {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.card[data-status='warning'] .title {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.repeat {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .toggle:hover {
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l4);
+  outline-offset: 1px;
+}
+
+.chevron {
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 4px 0 2px 42px;
+  gap: 6px;
+}
+
+.detailText {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin: 0;
+  gap: 2px 8px;
+  font: var(--dsw-font-xxs-12);
+}
+
+.metaLabel {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.metaValue {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.evidence {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.empty {
+  margin: 32px 0;
+  text-align: center;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xs-13);
+}
+
+@media (max-width: 560px) {
+  .root {
+    padding: 12px 12px 20px;
+  }
+
+  .detail {
+    padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .chevronOpen {
+    transition: none;
+  }
+}

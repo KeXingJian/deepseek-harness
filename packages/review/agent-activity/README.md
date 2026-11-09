@@ -99,7 +99,7 @@ None; this package neither assembles nor sends a provider request.
 - **Durable events only** — approvals, subagent hand-offs, and workflow phases are live Cordis events rather than Session records, so a chain folded from a log does not contain them.
 - **Intent quotes the model** — an `intent` card is the turn's first non-empty assistant text block, not a summary written by this package.
 - **Out-of-scope matching is a heuristic** — it compares changed paths with paths the session read and with the caller-supplied task text, and reports the result as an inference rather than a fact.
-- **No presentation layer yet** — cards and flags are the complete output; rendering, localization, and navigation belong to a client package that consumes this projection.
+- **One consumer so far** — `dsh-client-ui-agent-chain` renders these cards and flags; navigation from a card back to its evidence belongs to that view.
 - **Deletion line counts are not inferred** — a deletion reports the file, not a removed-line total the session did not record.
 - **The ceiling compresses look-around cards only** — a session that changed more than thirty distinct files still renders one card per file, because collapsing distinct files would hide exactly what a reviewer must read.
 

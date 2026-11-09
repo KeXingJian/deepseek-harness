@@ -6,6 +6,6 @@
 
 export * from './types.ts'
 export { chainFromSpans } from './chain.ts'
-export { createActivityFolder, foldActivity } from './fold.ts'
-export type { ActivityFolder } from './fold.ts'
+export { applyActivityEvent, createActivityFolder, foldActivity, initActivityState } from './fold.ts'
+export type { ActivityFolder, ActivityState } from './fold.ts'
 export { reviewFlags } from './risk.ts'

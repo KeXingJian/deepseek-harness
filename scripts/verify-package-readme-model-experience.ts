@@ -50,6 +50,7 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-context-menu': { kind: 'none', reason: 'Client menu presentation and contributed callbacks add no model input.' },
+  'packages/client/ui-agent-chain': { kind: 'none', reason: 'Renders the committed Session log as the review chain; the view contributes no model context or Session events.' },
   'packages/review/agent-activity': { kind: 'none', reason: 'Projects review-facing chain data from caller-supplied spans without contributing model context or Session events.' },
   'packages/client/ui-file-actions': { kind: 'none', reason: 'Explicit user file saves and clipboard operations add no model input.' },
   'packages/client/ui-entry-customization': { kind: 'none', reason: 'Controls browser launchers and prepares a reviewable Creator draft without submitting model input.' },

@@ -3,7 +3,7 @@ import { createAssistantMessage, createToolResultMessage, ToolCallId } from '@de
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { chainFromSpans, createActivityFolder, foldActivity } from '../src/index.ts'
+import { applyActivityEvent, chainFromSpans, createActivityFolder, foldActivity } from '../src/index.ts'
 
 /** Build a `turn/start` event. */
 function turnStart(seq: number, time: number, turn: number): SessionEvent {
@@ -94,6 +94,21 @@ function toolResult(seq: number, time: number, callId = 'call-1', isError = fals
 }
 
 describe('foldActivity', () => {
+  it('closes a tool span that carries no attributes yet', () => {
+    const state = {
+      spans: [{ seq: 1, kind: 'tool' as const, name: 'bash', startTime: 0, status: 'running' as const }],
+      openTurns: {},
+      openSteps: {},
+      openCalls: { 'call-1': 0 },
+    }
+    const next = applyActivityEvent(state, toolResult(2, 30, 'call-1', true, 'FAILED'))
+    expect(next.spans[0]).toMatchObject({ status: 'error', attributes: { errorCode: 'FAILED' } })
+
+    const plain = applyActivityEvent(state, toolResult(3, 40))
+    expect(plain.spans[0]).toMatchObject({ status: 'ok' })
+    expect(plain.spans[0]?.attributes).toBeUndefined()
+  })
+
   it('exposes running spans between applied events', () => {
     const folder = createActivityFolder()
     folder.apply(turnStart(0, 10, 1))
