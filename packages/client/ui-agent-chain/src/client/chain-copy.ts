@@ -3,7 +3,7 @@
  * and palettes, status dots, and the expansion rows one card can offer.
  */
 
-import type { ChainCard, ChainKind, ChainStatus, RiskSeverity } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan, ChainCard, ChainKind, ChainStatus, RiskSeverity } from '@deepseek-ai/dsh-agent-activity'
 import type { StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentChainKey } from './locales.ts'
 
@@ -67,6 +67,20 @@ export interface ChainDetailRow {
   readonly label: string
   /** Field value as recorded; never translated. */
   readonly value: string
+  /** Workspace path the value names, when the file preview can open it. */
+  readonly file?: string | undefined
+}
+
+/** One contributing span shown under an expanded card. */
+export interface ChainEvidenceSpan {
+  /** Session-log position a reader cross-checks in the transcript. */
+  readonly seq: number
+  /** Raw span name, never translated. */
+  readonly name: string
+  /** Dot state for the span's settlement. */
+  readonly dot: StateDotState
+  /** Tool-call identity when this span is a call; absent for turn and step spans. */
+  readonly callId?: string | undefined
 }
 
 /** Translate one review-chain key. */
@@ -108,6 +122,24 @@ export function filterCards(cards: readonly ChainCard[], filter: ChainFilter): r
 }
 
 /**
+ * Map a span settlement onto the shared state dot.
+ * @param status - settlement recorded on the span.
+ * @returns dot state; a span stopped before it settled reads as a warning.
+ */
+export function spanDot(status: ActivitySpan['status']): StateDotState {
+  switch (status) {
+    case 'running':
+      return 'ongoing'
+    case 'ok':
+      return 'done'
+    case 'error':
+      return 'error'
+    default:
+      return 'warning'
+  }
+}
+
+/**
  * Read one recorded fact as a string.
  * @param meta - card facts.
  * @param key - fact name.
@@ -141,7 +173,7 @@ function metaCount(meta: ChainCard['meta'], key: string): string | undefined {
 export function detailRows(card: ChainCard, t: ChainTranslate): readonly ChainDetailRow[] {
   const rows: ChainDetailRow[] = []
   const path = metaString(card.meta, 'path')
-  if (path !== undefined) rows.push({ label: t('meta.path'), value: path })
+  if (path !== undefined) rows.push({ label: t('meta.path'), value: path, file: path })
   const command = metaString(card.meta, 'command')
   if (command !== undefined) rows.push({ label: t('meta.command'), value: command })
   const tool = metaString(card.meta, 'tool')
@@ -156,6 +188,27 @@ export function detailRows(card: ChainCard, t: ChainTranslate): readonly ChainDe
   const searches = metaCount(card.meta, 'searches')
   if (searches !== undefined) rows.push({ label: t('meta.searches'), value: searches })
   return rows
+}
+
+/**
+ * Read the spans one card cites, in the order its evidence lists them.
+ * @param card - the expanded card.
+ * @param spans - every span the chain snapshot published.
+ * @returns one row per cited sequence the snapshot still holds.
+ */
+export function evidenceSpans(card: ChainCard, spans: readonly ActivitySpan[]): readonly ChainEvidenceSpan[] {
+  const bySeq = new Map(spans.map(span => [span.seq, span]))
+  return card.evidenceSeqs.flatMap((seq) => {
+    const span = bySeq.get(seq)
+    if (span === undefined) return []
+    const callId = span.attributes?.callId
+    return [{
+      seq,
+      name: span.name,
+      dot: spanDot(span.status),
+      callId: typeof callId === 'string' ? callId : undefined,
+    }]
+  })
 }
 
 /**

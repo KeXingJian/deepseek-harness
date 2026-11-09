@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The review-chain view turns one Session's agent activity into a short, readable execution chain inside the conversation view. It registers the `Chain` conversation view tab (`执行链` in Chinese), renders the six card kinds the `dsh-agent-activity` projection produces, filters them, expands one card's recorded facts and evidence, and shows the review risk flags above the list. The plugin runs in the browser only; the Node half is an empty `apply` that keeps the package a Loader row.
+The review-chain view turns one Session's agent activity into a short, readable execution chain inside the conversation view. It registers the `Chain` conversation view tab (`执行链` in Chinese), renders the six card kinds the `dsh-agent-activity` projection produces, filters them, expands one card's recorded facts and evidence, and shows the review risk flags above the list. A recorded path opens the file in the Sidebar preview, and an evidence row opens its tool call in Trajectory. The plugin runs in the browser only; the Node half is an empty `apply` that keeps the package a Loader row.
 
 ## Table of Contents
 
@@ -35,16 +35,21 @@ Three filters narrow the list: `All`, `Changes only`, and `Risks only`. `Risks o
 
 ### Expanding one card
 
-The disclosure button reveals what the card recorded: the projection's detail text, its named facts (path, command, tool, operation, file count, search count), and the evidence sequence numbers a reviewer can open in the Session log. Cards without recorded facts, details, or evidence carry no disclosure button.
+The disclosure button reveals what the card recorded: the projection's detail text, its named facts (path, command, tool, operation, file count, search count), and one row per contributing span with its session-log sequence, span name, and settlement. Cards without recorded facts, details, or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
+
+### Opening what a card names
+
+A path fact and a risk flag's files are buttons: each opens that file in the Sidebar preview, addressed under the Session's workspace root, so the reviewer reads the file beside the chain. An evidence row that came from a tool call opens that call in Trajectory through the conversation's inspection target; a turn or step span keeps its sequence but has no call to inspect.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
 The plugin contributes four things in `apply`: the `agentChain` dictionary, one Conversation Definition, one Conversation view target, and one `conversation.view` slot entry.
 
-- `chainDefinition` matches the seven durable event types the chain reads and folds them through `@deepseek-ai/dsh-agent-activity`. Every matched event is offered as a start candidate: the engine starts the Context from the earliest retained event of the loaded history window and applies the rest as updates, which also re-derives the chain when the window slides.
-- `chainViewDefinition` publishes one snapshot per Session — `{ cards, flags }` — from the node the Definition builds. The node reuses the engine-owned Context key; a hand-written key fails the engine's identity check.
-- `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. `chain-copy.ts` holds the filter, kind, and severity vocabulary plus the expansion rows, so the component keeps no copy and no service access.
+- `chainDefinition` matches the seven durable event types the chain reads and folds them through `@deepseek-ai/dsh-agent-activity`. Every matched event is offered as a start candidate: the engine starts the Context from the earliest retained event of the loaded history window and applies the rest as updates, which also re-derives the chain when the window slides. The built node carries the folded chain and the spans it was folded from, so expansion can read one span by sequence.
+- `chainViewDefinition` publishes one snapshot per Session — `{ cards, flags, spans }` — from the node the Definition builds. The node reuses the engine-owned Context key; a hand-written key fails the engine's identity check.
+- `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. `chain-copy.ts` holds the filter, kind, and severity vocabulary plus the expansion rows and evidence rows, so the component keeps no copy and no service access. The view receives `inspectCall` from the conversation view owner share and calls it with a span's recorded call identity.
+- The slot's `inject` face resolves a card's path against the Session's workspace root — read from `sessions.list` at click time — and opens it through `sidebarRight.openResource` as a Session-scoped file address; the file preview owns reading the content.
 - Styling is a CSS Module over `--dsw-*` tokens; the root bounds itself to `--dsh-chat-content-width` and never scrolls on its own, because the conversation scrollport owns scrolling.
 
 <a id="further-exploration"></a>
@@ -65,11 +70,10 @@ None.
 
 ## Known Limitations and Deferred Work
 
-- **Evidence is text, not navigation** — a card shows its sequence numbers; opening the corresponding file or event belongs to the review-linking work.
 - **Titles are not localized** — card titles and flag reasons come from the `dsh-agent-activity` projection, which still writes them as Chinese literals; moving that copy into a dictionary belongs to the localization pass.
 - **No folding of the chain itself** — every card renders; there is no "collapse all" or per-kind grouping yet.
-- **The slot inject closure is uncovered** — the per-file coverage gate does not yet reach `apply`'s session-scoped `inject` callback, because the assembled whole-client spec boots without a Session; everything else in the package is at 100%.
+- **Turn and step evidence does not navigate** — only a tool-call span carries the call identity Trajectory can focus, so a turn or step row stays a label.
 
 ### Dev Note
 
-The tab registers into `conversation.view`, not a right-sidebar surface: the chain is a reading of one Session, and the view tab strip already carries the Session's other readings (Chat, Trajectory).
+The tab registers into `conversation.view`, not a right-sidebar surface: the chain is a reading of one Session, and the view tab strip already carries the Session's other readings (Chat, Trajectory). File links then use the right Sidebar for content, because its preview already resolves a Session-scoped file address; the chain itself never reads a file.

@@ -3,12 +3,12 @@
  * and the expandable decision.
  */
 import { describe, expect, it } from 'vitest'
-import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan, ChainCard } from '@deepseek-ai/dsh-agent-activity'
 import type { AgentChainKey } from '../src/client/locales.ts'
 import { en } from '../src/client/locales.ts'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
-  detailRows, filterCards, isExpandable, statusDot,
+  detailRows, evidenceSpans, filterCards, isExpandable, spanDot, statusDot,
 } from '../src/client/chain-copy.ts'
 
 /** Translate through the shipped English dictionary. */
@@ -19,6 +19,16 @@ function t(key: AgentChainKey): string {
 /** One card with the fields a test does not state defaulted to a quiet read. */
 function card(overrides: Partial<ChainCard> & Pick<ChainCard, 'kind' | 'title'>): ChainCard {
   return { id: `${overrides.kind}:1`, startedAt: 0, status: 'ok', evidenceSeqs: [], ...overrides }
+}
+
+/** One contributing span as the Definition publishes it. */
+function span(
+  seq: number,
+  name: string,
+  status: ActivitySpan['status'] = 'ok',
+  attributes?: Readonly<Record<string, string>>,
+): ActivitySpan {
+  return { seq, kind: 'tool', name, startTime: 0, status, ...(attributes === undefined ? {} : { attributes }) }
 }
 
 describe('statusDot', () => {
@@ -56,6 +66,19 @@ describe('filter vocabulary', () => {
   })
 })
 
+describe('spanDot', () => {
+  it('maps every span settlement onto the shared state dot', () => {
+    expect(spanDot('running')).toBe('ongoing')
+    expect(spanDot('ok')).toBe('done')
+    expect(spanDot('error')).toBe('error')
+  })
+
+  it('reads a span that stopped before settling as a warning', () => {
+    expect(spanDot('cancelled')).toBe('warning')
+    expect(spanDot('interrupted')).toBe('warning')
+  })
+})
+
 describe('filterCards', () => {
   const cards = [
     card({ kind: 'intent', title: 'plan' }),
@@ -85,7 +108,7 @@ describe('detailRows', () => {
       meta: { path: 'src/a.ts', command: 'go test', tool: 'edit', op: 'update', files: 2, searches: 3 },
     }), t)
     expect(rows).toEqual([
-      { label: 'Path', value: 'src/a.ts' },
+      { label: 'Path', value: 'src/a.ts', file: 'src/a.ts' },
       { label: 'Command', value: 'go test' },
       { label: 'Tool', value: 'edit' },
       { label: 'Operation', value: 'modified' },
@@ -106,6 +129,36 @@ describe('detailRows', () => {
 
   it('reports nothing for a card without facts', () => {
     expect(detailRows(card({ kind: 'result', title: 'done' }), t)).toEqual([])
+  })
+})
+
+describe('evidenceSpans', () => {
+  const spans = [
+    span(3, 'turn:1', 'ok'),
+    span(7, 'bash', 'error', { callId: 'call-7' }),
+    span(9, 'read', 'running'),
+  ]
+
+  it('reads the cited spans in evidence order', () => {
+    const card_ = card({ kind: 'change', title: 'x', evidenceSeqs: [9, 7] })
+    expect(evidenceSpans(card_, spans)).toEqual([
+      { seq: 9, name: 'read', dot: 'ongoing', callId: undefined },
+      { seq: 7, name: 'bash', dot: 'error', callId: 'call-7' },
+    ])
+  })
+
+  it('keeps a turn span without a call identity', () => {
+    expect(evidenceSpans(card({ kind: 'intent', title: 'x', evidenceSeqs: [3] }), spans))
+      .toEqual([{ seq: 3, name: 'turn:1', dot: 'done', callId: undefined }])
+  })
+
+  it('skips a cited sequence the snapshot no longer holds', () => {
+    expect(evidenceSpans(card({ kind: 'intent', title: 'x', evidenceSeqs: [3, 99] }), spans))
+      .toEqual([{ seq: 3, name: 'turn:1', dot: 'done', callId: undefined }])
+  })
+
+  it('reports nothing for a card that cites nothing', () => {
+    expect(evidenceSpans(card({ kind: 'result', title: 'done' }), spans)).toEqual([])
   })
 })
 

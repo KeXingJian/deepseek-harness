@@ -3,7 +3,7 @@
  */
 
 import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { applyActivityEvent, chainFromSpans, initActivityState } from '@deepseek-ai/dsh-agent-activity'
 import type { ActivityState } from '@deepseek-ai/dsh-agent-activity'
 
@@ -38,7 +38,9 @@ export const chainDefinition: ConversationNodeDefinition<ActivityState> = {
       kind: 'agent-chain',
       id: context.id,
       target: 'agent-chain',
-      data: chainFromSpans(state.spans),
+      // The result alone cannot show what backs a card: expansion reads the raw
+      // span by sequence, so the snapshot carries the spans it was folded from.
+      data: { ...chainFromSpans(state.spans), spans: state.spans },
     }
   },
 }

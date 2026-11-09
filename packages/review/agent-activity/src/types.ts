@@ -19,7 +19,12 @@ export interface ActivitySpan {
   readonly endTime?: number | undefined
   /** Settlement state of the span. */
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
-  /** Presentation facts the collection layer attached to this span. */
+  /**
+   * Presentation facts the collection layer attached to this span: the model's
+   * tool arguments, a bash removal's derived `path` and `op`, the turn's
+   * one-line `intent`, and the recorded `callId` that addresses a tool call in
+   * an inspection view.
+   */
   readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined
 }
 

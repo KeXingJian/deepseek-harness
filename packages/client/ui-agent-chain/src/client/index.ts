@@ -5,9 +5,12 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { fileAddressFor, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { AgentChainView } from './AgentChainView.tsx'
 import { chainDefinition } from './chain-definition.ts'
 import { chainViewDefinition, EMPTY_CHAIN } from './chain-view.ts'
@@ -24,8 +27,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export type { ChainSnapshot } from './chain-view.ts'
 export type { AgentChainViewProps } from './AgentChainView.tsx'
 
-/** Required services: the slot registry, conversation targets, and dictionaries. */
-export const inject = ['slots', 'uiConversation', 'locale']
+/** Required services: slots, conversation targets, dictionaries, Session roots, and the Sidebar. */
+export const inject = ['slots', 'uiConversation', 'locale', 'sessions', 'sidebarRight']
 
 /**
  * Client plugin body: register the chain Definition, the view target, and the tab.
@@ -50,6 +53,13 @@ export function apply(ctx: ClientContext): void {
             getSnapshot: () => target.getSnapshot() ?? EMPTY_CHAIN,
             subscribe: (listener: () => void) => target.subscribe(listener),
           },
+        },
+        // A card names a path as the tool call recorded it: relative to the
+        // Session root, or absolute inside it. The Sidebar preview resolves the
+        // address against the root the Host holds for this Session.
+        openFile: (path: string) => {
+          const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+          ctx.sidebarRight.openResource(fileAddressFor(sessionId, cwd, resolveWorkspacePath(cwd, path)))
         },
       }
     },

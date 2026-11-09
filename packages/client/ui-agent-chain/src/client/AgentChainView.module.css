@@ -70,7 +70,10 @@
 }
 
 .riskFiles {
+  display: flex;
+  flex-wrap: wrap;
   min-width: 0;
+  gap: 0 8px;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxs-12);
@@ -204,13 +207,87 @@
 
 .evidence {
   display: flex;
-  flex-wrap: wrap;
-  margin: 0;
+  flex-direction: column;
   min-width: 0;
   gap: 4px;
-  overflow-wrap: anywhere;
+  font: var(--dsw-font-xxs-12);
+}
+
+.evidenceList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  list-style: none;
+}
+
+.evidenceRow,
+.evidenceButton {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.evidenceButton {
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .evidenceButton:hover .evidenceName {
+    color: var(--dsw-alias-link);
+    text-decoration: underline;
+  }
+}
+
+.evidenceButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l4);
+  outline-offset: 1px;
+}
+
+.evidenceSeq {
+  flex: none;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxs-12);
+}
+
+.evidenceName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font: var(--dsw-font-xxs-12);
+}
+
+/* A file row opens the preview beside the conversation instead of reading as text. */
+.fileLink {
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-link);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .fileLink:hover {
+    text-decoration: underline;
+  }
+}
+
+.fileLink:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l4);
+  outline-offset: 1px;
 }
 
 .empty {

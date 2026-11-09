@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chaîne d’exécution",
+    "description": "Résume l’activité de l’agent d’une session en une chaîne d’exécution lisible, avec filtres, dépliage et marqueurs de risque pour la revue."
+  }
+}

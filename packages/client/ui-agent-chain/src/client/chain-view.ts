@@ -5,7 +5,7 @@
 import type {
   ConversationViewBuilder, ConversationViewDefinition, ConversationViewNode,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ChainCard, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan, ChainCard, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
 
 /** What the view renders: the projected chain for one Session. */
 export interface ChainSnapshot {
@@ -13,10 +13,12 @@ export interface ChainSnapshot {
   readonly cards: readonly ChainCard[]
   /** Review risk flags ordered by severity. */
   readonly flags: readonly RiskFlag[]
+  /** Every span the cards cite, in log order; expansion reads them by sequence. */
+  readonly spans: readonly ActivitySpan[]
 }
 
 /** Snapshot before the Session publishes any chain node. */
-export const EMPTY_CHAIN: ChainSnapshot = { cards: [], flags: [] }
+export const EMPTY_CHAIN: ChainSnapshot = { cards: [], flags: [], spans: [] }
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationViewSnapshotMap {

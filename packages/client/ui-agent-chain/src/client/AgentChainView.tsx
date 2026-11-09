@@ -1,16 +1,17 @@
 /**
  * Review chain view: the risk banner, the three card filters, and the
  * readable card list a reviewer scans without opening the transcript.
+ * Expansion reveals the files and raw spans a card was folded from.
  */
 
 import { Fragment, useState } from 'react'
 import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
 import { IconChevronDownOutlineRegular, Pill, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChainSnapshot } from './chain-view.ts'
-import type { ChainFilter } from './chain-copy.ts'
+import type { ChainEvidenceSpan, ChainFilter } from './chain-copy.ts'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
-  detailRows, filterCards, isExpandable, statusDot,
+  detailRows, evidenceSpans, filterCards, isExpandable, statusDot,
 } from './chain-copy.ts'
 import type { AgentChainKey } from './locales.ts'
 import css from './AgentChainView.module.css'
@@ -21,17 +22,76 @@ export interface AgentChainViewProps {
   readonly useChain: <S>(selector: (snapshot: ChainSnapshot) => S) => S
   /** Translate one review-chain key. */
   readonly t: (key: AgentChainKey) => string
+  /** Open one workspace file in the Sidebar preview. */
+  readonly openFile: (path: string) => void
+  /** Open a tool call in the View that claims call focus; absent when none does. */
+  readonly inspectCall: ((callId: string) => void) | undefined
+}
+
+/** One file name that opens its content beside the conversation. */
+function FileButton({ path, openFile, t }: {
+  path: string
+  openFile: AgentChainViewProps['openFile']
+  t: AgentChainViewProps['t']
+}) {
+  return (
+    <button
+      type="button"
+      className={css.fileLink}
+      aria-label={`${t('card.openFile')} ${path}`}
+      onClick={() => { openFile(path) }}
+    >
+      {path}
+    </button>
+  )
+}
+
+/** One contributing span; a tool call keeps its sequence while it runs. */
+function EvidenceRow({ span, inspectCall, t }: {
+  span: ChainEvidenceSpan
+  inspectCall: AgentChainViewProps['inspectCall']
+  t: AgentChainViewProps['t']
+}) {
+  const seq = `#${String(span.seq)}`
+  const content = (
+    <>
+      <StateDot state={span.dot} />
+      <span className={css.evidenceSeq}>{seq}</span>
+      <span className={css.evidenceName}>{span.name}</span>
+    </>
+  )
+  const callId = span.callId
+  if (callId === undefined || inspectCall === undefined) {
+    return <li className={css.evidenceRow}>{content}</li>
+  }
+  return (
+    <li className={css.evidenceRow}>
+      <button
+        type="button"
+        className={css.evidenceButton}
+        aria-label={`${t('card.openEvent')} ${seq}`}
+        onClick={() => { inspectCall(callId) }}
+      >
+        {content}
+      </button>
+    </li>
+  )
 }
 
 /** One card row with its own disclosure state. */
-function ChainCardRow({ card, open, onToggle, t }: {
+function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }: {
   card: ChainCard
+  spans: ChainSnapshot['spans']
   open: boolean
   onToggle: () => void
+  openFile: AgentChainViewProps['openFile']
+  inspectCall: AgentChainViewProps['inspectCall']
   t: AgentChainViewProps['t']
 }) {
   const rows = detailRows(card, t)
   const expandable = isExpandable(card, rows)
+  // Collapsed cards stay cheap: the span lookup runs only for a revealed card.
+  const evidence = open ? evidenceSpans(card, spans) : []
   return (
     <li className={css.card} data-kind={card.kind} data-status={card.status}>
       <div className={css.head}>
@@ -59,16 +119,24 @@ function ChainCardRow({ card, open, onToggle, t }: {
               {rows.map(row => (
                 <Fragment key={row.label}>
                   <dt className={css.metaLabel}>{row.label}</dt>
-                  <dd className={css.metaValue}>{row.value}</dd>
+                  <dd className={css.metaValue}>
+                    {row.file === undefined
+                      ? row.value
+                      : <FileButton path={row.file} openFile={openFile} t={t} />}
+                  </dd>
                 </Fragment>
               ))}
             </dl>
           )}
-          {card.evidenceSeqs.length > 0 && (
-            <p className={css.evidence}>
+          {evidence.length > 0 && (
+            <div className={css.evidence}>
               <span className={css.metaLabel}>{t('card.evidence')}</span>
-              <span>{card.evidenceSeqs.map(seq => `#${String(seq)}`).join(' · ')}</span>
-            </p>
+              <ul className={css.evidenceList}>
+                {evidence.map(span => (
+                  <EvidenceRow key={span.seq} span={span} inspectCall={inspectCall} t={t} />
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
@@ -78,10 +146,10 @@ function ChainCardRow({ card, open, onToggle, t }: {
 
 /**
  * Render the review execution chain.
- * @param props - bound snapshot hook and translator.
+ * @param props - bound snapshot hook, translator, file opener, and call inspector.
  * @returns the chain view, filters, and risk banner, or the empty-state line.
  */
-export function AgentChainView({ useChain, t }: AgentChainViewProps) {
+export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChainViewProps) {
   const chain = useChain(snapshot => snapshot)
   const [filter, setFilter] = useState<ChainFilter>('all')
   const [expanded, setExpanded] = useState<readonly string[]>([])
@@ -102,7 +170,13 @@ export function AgentChainView({ useChain, t }: AgentChainViewProps) {
               <li key={flag.code} className={css.riskItem}>
                 <Tag tone={SEVERITY_TONES[flag.severity]}>{t(SEVERITY_KEYS[flag.severity])}</Tag>
                 <span className={css.riskReason}>{flag.reason}</span>
-                {flag.evidenceFiles.length > 0 && <span className={css.riskFiles}>{flag.evidenceFiles.join(' · ')}</span>}
+                {flag.evidenceFiles.length > 0 && (
+                  <span className={css.riskFiles}>
+                    {flag.evidenceFiles.map(path => (
+                      <FileButton key={path} path={path} openFile={openFile} t={t} />
+                    ))}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -123,8 +197,11 @@ export function AgentChainView({ useChain, t }: AgentChainViewProps) {
               <ChainCardRow
                 key={card.id}
                 card={card}
+                spans={chain.spans}
                 open={expanded.includes(card.id)}
                 onToggle={() => { toggle(card.id) }}
+                openFile={openFile}
+                inspectCall={inspectCall}
                 t={t}
               />
             ))}

@@ -130,7 +130,12 @@ describe('foldActivity', () => {
     ])
     expect(spans.map(span => span.kind)).toEqual(['turn', 'step', 'tool'])
     expect(spans[0]).toMatchObject({ status: 'ok', endTime: 600, attributes: { intent: '修复排序的空数组问题' } })
-    expect(spans[2]).toMatchObject({ name: 'read', status: 'ok', endTime: 400, attributes: { path: 'src/math.ts' } })
+    expect(spans[2]).toMatchObject({
+      name: 'read',
+      status: 'ok',
+      endTime: 400,
+      attributes: { path: 'src/math.ts', callId: 'call-1' },
+    })
   })
 
   it('records failure state and the error code of a tool result', () => {
@@ -163,8 +168,8 @@ describe('foldActivity', () => {
       rawToolCall(1, 20, 'read', 'not json'),
       rawToolCall(2, 30, 'read', '42'),
     ])
-    expect(spans[1]?.attributes).toEqual({})
-    expect(spans[2]?.attributes).toEqual({})
+    expect(spans[1]?.attributes).toEqual({ callId: 'call-1' })
+    expect(spans[2]?.attributes).toEqual({ callId: 'call-1' })
   })
 
   it('maps turn-end reasons to span statuses', () => {

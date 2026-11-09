@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-评审执行链视图把单个会话的 agent 活动压缩成一条可读的执行链，放在会话视图里。<br>它注册 `执行链`（英文 `Chain`）视图标签，渲染 `dsh-agent-activity` 投影产出的六类卡片，支持筛选、展开单卡记录的事实与依据，并在列表上方展示评审风险标记。<br>插件只在浏览器运行；Node 侧是一个空的 `apply`，只为让这个包成为一条 Loader 行。
+评审执行链视图把单个会话的 agent 活动压缩成一条可读的执行链，放在会话视图里。<br>它注册 `执行链`（英文 `Chain`）视图标签，渲染 `dsh-agent-activity` 投影产出的六类卡片，支持筛选、展开单卡记录的事实与依据，并在列表上方展示评审风险标记。<br>卡片记录的路径可在右侧栏预览中打开文件，依据行可在“轨迹”中打开对应工具调用。<br>插件只在浏览器运行；Node 侧是一个空的 `apply`，只为让这个包成为一条 Loader 行。
 
 ## 目录
 
@@ -35,16 +35,21 @@ kind: "package-reference"
 
 ### 展开单张卡片
 
-展开按钮揭示卡片记录的内容：投影的详情文本、具名事实（路径、命令、工具、操作、文件数、检索数），以及评审者可以回到会话日志核对的依据序号。<br>没有详情、事实或依据的卡片不提供展开按钮。
+展开按钮揭示卡片记录的内容：投影的详情文本、具名事实（路径、命令、工具、操作、文件数、检索数），以及每条来源 span 的一行——会话日志序号、span 名称与结算状态。<br>没有详情、事实或依据的卡片不提供展开按钮；快照里已不存在的依据序号会被跳过。
+
+### 打开卡片指向的对象
+
+路径事实与风险标记里的文件都是按钮：点击在右侧栏预览中打开该文件，地址按会话工作区根解析，评审者可以在执行链旁直接读文件。<br>来自工具调用的依据行会通过会话的检查目标在“轨迹”中打开该调用；轮次与步骤 span 保留序号，但没有可检查的调用。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
 插件在 `apply` 里贡献四样东西：`agentChain` 字典、一个 Conversation Definition、一个 Conversation 视图 target，以及一个 `conversation.view` 槽位条目。
 
-- `chainDefinition` 匹配执行链读取的七种持久事件，并通过 `@deepseek-ai/dsh-agent-activity` 折叠它们。<br>每个匹配事件都作为 start 候选：引擎用已加载历史窗口里最早的事件初始化 Context，其余按 update 应用，窗口滑动时也会重新推导执行链。
-- `chainViewDefinition` 按会话发布一份快照 —— `{ cards, flags }` —— 来自 Definition 构建的节点。<br>该节点复用引擎生成的 Context key；自己手写的 key 过不了引擎的身份校验。
-- `AgentChainView` 通过槽位的 `useChain` hook 与 `t` 座位渲染快照。<br>`chain-copy.ts` 持有筛选、类型、严重级的词汇与展开行，因此组件里既没有文案副本，也不访问服务。
+- `chainDefinition` 匹配执行链读取的七种持久事件，并通过 `@deepseek-ai/dsh-agent-activity` 折叠它们。<br>每个匹配事件都作为 start 候选：引擎用已加载历史窗口里最早的事件初始化 Context，其余按 update 应用，窗口滑动时也会重新推导执行链。<br>它构建的节点同时携带折叠结果与来源 span，因此展开时可以按序号读取单条 span。
+- `chainViewDefinition` 按会话发布一份快照 —— `{ cards, flags, spans }` —— 来自 Definition 构建的节点。<br>该节点复用引擎生成的 Context key；自己手写的 key 过不了引擎的身份校验。
+- `AgentChainView` 通过槽位的 `useChain` hook 与 `t` 座位渲染快照。<br>`chain-copy.ts` 持有筛选、类型、严重级的词汇，以及展开行与依据行，因此组件里既没有文案副本，也不访问服务。<br>视图从会话视图的 owner share 收到 `inspectCall`，并用 span 记录的调用标识调用它。
+- 槽位的 `inject` 面在点击时从 `sessions.list` 读取会话工作区根，把卡片路径解析为会话作用域的文件地址并通过 `sidebarRight.openResource` 打开；读取文件内容由预览自己负责。
 - 样式是一个基于 `--dsw-*` 令牌的 CSS Module；根节点宽度限制在 `--dsh-chat-content-width`，自身不滚动，滚动由会话滚动容器负责。
 
 <a id="further-exploration"></a>
@@ -66,12 +71,11 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
-- **依据只是文本，还不能跳转** —— 卡片展示依据序号；打开对应文件或事件属于评审联动的工作。
 - **标题未本地化** —— 卡片标题与风险原因是 `dsh-agent-activity` 投影产出的中文常量；把它们搬进字典属于本地化收尾。
 - **执行链自身还不能折叠** —— 所有卡片都会渲染；尚无“全部收起”或按类型分组。
-- **槽位 inject 闭包未覆盖** —— 逐文件覆盖率门禁还触达不到 `apply` 里按会话绑定的 `inject` 回调，因为整客户端 spec 启动时没有会话；包内其余文件均为 100%。
+- **轮次与步骤依据不能跳转** —— 只有工具调用 span 带有“轨迹”可聚焦的调用标识，因此轮次与步骤依据行只是标签。
 
 <a id="dev-note"></a>
 ### 开发备注
 
-标签注册进 `conversation.view`，而不是右侧栏：执行链是对单个会话的一种阅读，而视图标签栏已经承载了该会话的其他阅读方式（对话、轨迹）。
+标签注册进 `conversation.view`，而不是右侧栏：执行链是对单个会话的一种阅读，而视图标签栏已经承载了该会话的其他阅读方式（对话、轨迹）。<br>文件链接随后落在右侧栏，因为它的预览已经能解析会话作用域的文件地址；执行链本身从不读取文件。

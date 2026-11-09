@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-agent-activity
  */
 
-import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types'
 import type { ActivitySpan } from './types.ts'
 
 /** Attributes a span accepts while it is being built. */
@@ -183,6 +183,9 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
           attributes.path = target
         }
       }
+      // The call identity is not a model-produced argument: it is recorded so a
+      // span-only projection can still address this call in an inspection view.
+      attributes.callId = String(event.data.callId)
       const span: ActivitySpan = {
         seq: event.seq,
         kind: 'tool',

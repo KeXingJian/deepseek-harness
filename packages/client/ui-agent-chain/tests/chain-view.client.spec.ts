@@ -3,15 +3,15 @@
  * into the snapshot the view renders.
  */
 import { describe, expect, it } from 'vitest'
-import type { ChainResult } from '@deepseek-ai/dsh-agent-activity'
 import type { ConversationTimelineSnapshot, ConversationViewNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChainSnapshot } from '../src/client/chain-view.ts'
 import { chainViewDefinition, EMPTY_CHAIN } from '../src/client/chain-view.ts'
 
 /** Timeline facts the builder accepts but the chain ignores. */
 const TIMELINE: ConversationTimelineSnapshot = { turnOrder: [], turns: new Map() }
 
 /** A chain snapshot as the Definition publishes it. */
-const CHAIN: ChainResult = {
+const CHAIN: ChainSnapshot = {
   cards: [{
     id: 'intent:1',
     kind: 'intent',
@@ -26,6 +26,7 @@ const CHAIN: ChainResult = {
     reason: 'test files were modified',
     evidenceFiles: ['tests/a.spec.ts'],
   }],
+  spans: [{ seq: 1, kind: 'turn', name: 'turn:1', startTime: 1_000, status: 'ok' }],
 }
 
 /** One published view node carrying a chain snapshot. */
@@ -48,7 +49,7 @@ describe('chain view target', () => {
   it('replaces the published node when the engine republishes its key', () => {
     const builder = chainViewDefinition.create()
     builder.apply({ upserts: [node(CHAIN, 'stable-key')], timeline: TIMELINE })
-    const next: ChainResult = { cards: [], flags: [] }
+    const next: ChainSnapshot = { cards: [], flags: [], spans: [] }
     expect(builder.apply({ upserts: [node(next, 'stable-key')], timeline: TIMELINE })).toBe(next)
   })
 

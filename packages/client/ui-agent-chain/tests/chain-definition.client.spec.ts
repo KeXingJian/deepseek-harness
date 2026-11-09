@@ -12,7 +12,8 @@ import type {
   ConversationStartMatch,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { conversationContextKey } from '@deepseek-ai/dsh-client-ui-conversation/src/client/contract/conversation.ts'
-import type { ActivityState, ChainResult } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivityState } from '@deepseek-ai/dsh-agent-activity'
+import type { ChainSnapshot } from '../src/client/chain-view.ts'
 import { chainDefinition } from '../src/client/chain-definition.ts'
 
 /** The key the engine mints for this Definition's single Context. */
@@ -85,12 +86,13 @@ describe('chain Definition view node', () => {
     expect(node?.target).toBe('agent-chain')
   })
 
-  it('publishes the folded chain as the node data', () => {
+  it('publishes the folded chain and its spans as the node data', () => {
     const state = foldAll()
     const node = chainDefinition.buildViewNode?.({ ...context(state), state })
-    const chain = node?.data as ChainResult
+    const chain = node?.data as ChainSnapshot
     expect(chain.cards.map(card => card.kind)).toContain('recon')
     expect(chain.cards.at(-1)?.kind).toBe('result')
+    expect(chain.spans).toBe(state.spans)
   })
 
   it('publishes nothing before the Context has State', () => {
