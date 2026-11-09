@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/review/agent-activity/README.md
+/:
+  en: a9f8b30d8c06a4e4
+  zh: 68b1e05f74afa7bd
+/deepseek-ai-dsh-agent-activity:
+  en: 457778710398048b
+  zh: 64a30ebd6cffafab
+/deepseek-ai-dsh-agent-activity/summary:
+  en: 822fb7e034f21e0e
+  zh: 99457bf1d7b452b3
+/deepseek-ai-dsh-agent-activity/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 405b30feaf48c087
+/deepseek-ai-dsh-agent-activity/use-this-package:
+  en: dcc01e8bab917e3f
+  zh: 80be796c6b230677
+/deepseek-ai-dsh-agent-activity/use-this-package/folding-a-session-log:
+  en: d667781b325e255a
+  zh: ccefacda740c2ee4
+/deepseek-ai-dsh-agent-activity/use-this-package/cards:
+  en: b90499e4055c27ee
+  zh: 9de895a10dcaac4d
+/deepseek-ai-dsh-agent-activity/use-this-package/risk-flags:
+  en: 018b844675fb244e
+  zh: 8b9182d4905d178b
+/deepseek-ai-dsh-agent-activity/understand-the-implementation:
+  en: 36216373a8cb767b
+  zh: 9c06ac54a48f54d1
+/deepseek-ai-dsh-agent-activity/further-exploration:
+  en: 34173c7785a4d839
+  zh: d59a66196db8f78e
+/deepseek-ai-dsh-agent-activity/model-experience:
+  en: 36a9e36361449fdf
+  zh: b1284c78f56055fc
+/deepseek-ai-dsh-agent-activity/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: 4fd78cfe2f71d092
+/deepseek-ai-dsh-agent-activity/known-limitations-and-deferred-work:
+  en: 5e4d0324423fe12e
+  zh: ef6a4bec34cffd33
+/deepseek-ai-dsh-agent-activity/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 08ac90a2efebf8ad
