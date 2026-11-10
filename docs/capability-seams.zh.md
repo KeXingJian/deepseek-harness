@@ -317,12 +317,15 @@ flowchart LR
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
   pkg_experimental_liveshare["experimental-liveshare"]
   svc_liveshareShares["ctx.liveshareShares<br/>Owner share management Remote"]
+  pkg_agent_trace["agent-trace"]
+  svc_agentTrace["ctx.agentTrace<br/>Review activity trace collection"]
   pkg_action_cards --> svc_actionCards
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
   pkg_agent_preset_registry --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
+  pkg_agent_trace --> svc_agentTrace
   pkg_api_gateway --> svc_typertGateway
   pkg_api_job_controller --> svc_jobController
   pkg_api_remote_access --> svc_remoteAccess
@@ -760,5 +763,6 @@ flowchart LR
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 拥有内存定义注册表、Host 半的 vm 沙箱和 request-run 往返流程；浏览器页面通过其 Remote 命名空间在线访问同一服务。 |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 注册 Host inspect 提供方、镜像 Client 提供方 manifest，并通过动态 Cordis 传输路由 Client 查询。 |
 | `ctx.liveshareShares` | `service` | [`experimental-liveshare`](../packages/experimental/liveshare) | - | - | - | 以单个 Typert Remote 命名空间发布 owner 分享管理操作，供 owner 客户端面调用；每个方法都委托给同源路由原先使用的同一组操作。 |
+| `ctx.agentTrace` | `service` | [`agent-trace`](../packages/review/agent-trace) | - | - | - | 把已提交的 Session 事件折叠成活动 span，增量维护全日志计数，并按 Session 持久化一份有界摘要，供后续的全量视图使用。 |
 
 维护模式：混合模式。服务从 Cordis 声明中发现；接口、实现和消费方角色在 `scripts/gen-doc-graphs.ts` 中分类，并设有完整性守卫。

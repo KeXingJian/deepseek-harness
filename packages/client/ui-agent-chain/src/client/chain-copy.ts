@@ -188,7 +188,7 @@ function reasonText(reason: RiskReason, t: ChainTranslate): string {
 
 /**
  * 把卡片状态映射到共享的状态圆点。
- * @param status - 投影得到的卡片状态。
+ * @param state - 投影得到的卡片状态。
  * @returns 圆点状态；`ok` 显示为完成，`running` 显示为进行中的加载指示。
  */
 export function statusDot(state: ChainStatus | undefined): StateDotState {

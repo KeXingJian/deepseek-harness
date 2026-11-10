@@ -981,6 +981,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'service',
     note: 'Publishes the owner share-management operations as one Typert Remote namespace that the owner client face calls; every method delegates to the same operations the same-origin routes used.',
   },
+  {
+    key: 'agentTrace',
+    pkg: 'agent-trace',
+    title: 'Review activity trace collection',
+    mode: 'service',
+    note: 'Folds committed Session events into activity spans, keeps whole-log counters incrementally, and persists one bounded summary per Session for a later full-trace view.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {

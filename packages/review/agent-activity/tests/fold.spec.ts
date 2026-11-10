@@ -77,8 +77,18 @@ function rawToolCall(seq: number, time: number, name: string, argumentText: stri
   }
 }
 
+/** 工具结果事件的可选私有负载。 */
+type ToolResultMeta = Extract<SessionEvent, { type: 'tool/result' }>['data']['meta']
+
 /** Build a `tool/result` event. */
-function toolResult(seq: number, time: number, callId = 'call-1', isError = false, code?: string): SessionEvent {
+function toolResult(
+  seq: number,
+  time: number,
+  callId = 'call-1',
+  isError = false,
+  code?: string,
+  meta?: ToolResultMeta,
+): SessionEvent {
   return {
     type: 'tool/result',
     seq: SessionSeq(seq),
@@ -89,6 +99,7 @@ function toolResult(seq: number, time: number, callId = 'call-1', isError = fals
       step: 1,
       message: createToolResultMessage({ callId: ToolCallId(callId), content: [], isError }),
       ...(code === undefined ? {} : { error: { name: 'ToolError', code } }),
+      ...(meta === undefined ? {} : { meta }),
     },
   }
 }
@@ -102,6 +113,62 @@ describe('foldActivity', () => {
     const plain = applyActivityEvent(state, toolResult(3, 40))
     expect(plain.spans[0]).toMatchObject({ status: 'ok' })
     expect(plain.spans[0]?.attributes).toEqual({ callId: 'call-1' })
+  })
+
+  it('records file_path as the canonical path for file-system tools', () => {
+    const state = applyActivityEvent(
+      initActivityState(),
+      toolCall(1, 0, 'write', { file_path: 'internal/store.go', content: 'package store' }),
+    )
+    expect(state.spans[0]?.attributes).toMatchObject({ path: 'internal/store.go' })
+  })
+
+  it('records the mutation operation the tool result reports', () => {
+    const state = applyActivityEvent(initActivityState(), toolCall(1, 0, 'write', { file_path: 'internal/a.go' }))
+    const created = applyActivityEvent(
+      state,
+      toolResult(2, 30, 'call-1', false, undefined, { diffs: [], operation: 'create' }),
+    )
+    expect(created.spans[0]).toMatchObject({ status: 'ok', attributes: { path: 'internal/a.go', op: 'create' } })
+
+    const updated = applyActivityEvent(state, toolResult(3, 40))
+    expect(updated.spans[0]?.attributes).toEqual({ path: 'internal/a.go', callId: 'call-1' })
+  })
+
+  it('ignores tool results that report no mutation operation', () => {
+    const state = applyActivityEvent(initActivityState(), toolCall(1, 0, 'write', { file_path: 'internal/a.go' }))
+    const plain: ToolResultMeta[] = [null, [], { diffs: [], operation: 'rename' }, { diffs: [], operation: 7 }]
+    for (const meta of plain) {
+      const next = applyActivityEvent(state, toolResult(2, 30, 'call-1', false, undefined, meta))
+      expect(next.spans[0]?.attributes).toEqual({ path: 'internal/a.go', callId: 'call-1' })
+    }
+  })
+
+  it('keeps distinct files apart when the arguments use file_path', () => {
+    const spans = foldActivity([
+      turnStart(0, 10, 1),
+      toolCall(1, 100, 'write', { file_path: 'internal/a.go' }, 'call-1'),
+      toolResult(2, 110, 'call-1', false, undefined, { diffs: [], operation: 'create' }),
+      toolCall(3, 120, 'edit', { file_path: 'internal/b.go' }, 'call-2'),
+      toolResult(4, 130, 'call-2'),
+      toolCall(5, 140, 'edit', { file_path: 'internal/c.go' }, 'call-3'),
+      toolResult(6, 150, 'call-3'),
+      turnEnd(7, 160, 1, 'completed'),
+    ])
+    const result = chainFromSpans(spans)
+    expect(result.cards.filter(card => card.kind === 'change').map(card => card.title)).toEqual([
+      { copy: 'change', op: 'create', path: 'internal/a.go' },
+      { copy: 'change', op: 'update', path: 'internal/b.go' },
+      { copy: 'change', op: 'update', path: 'internal/c.go' },
+    ])
+  })
+
+  it('counts a read by its file_path', () => {
+    const spans = foldActivity([
+      toolCall(1, 100, 'read', { file_path: 'internal/a.go' }),
+      toolResult(2, 110),
+    ])
+    expect(chainFromSpans(spans).cards[0]).toMatchObject({ kind: 'recon', title: { copy: 'recon', files: 1 } })
   })
 
   it('exposes running spans between applied events', () => {

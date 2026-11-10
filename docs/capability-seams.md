@@ -315,12 +315,15 @@ flowchart LR
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
   pkg_experimental_liveshare["experimental-liveshare"]
   svc_liveshareShares["ctx.liveshareShares<br/>Owner share management Remote"]
+  pkg_agent_trace["agent-trace"]
+  svc_agentTrace["ctx.agentTrace<br/>Review activity trace collection"]
   pkg_action_cards --> svc_actionCards
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
   pkg_agent_preset_registry --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
+  pkg_agent_trace --> svc_agentTrace
   pkg_api_gateway --> svc_typertGateway
   pkg_api_job_controller --> svc_jobController
   pkg_api_remote_access --> svc_remoteAccess
@@ -758,5 +761,6 @@ flowchart LR
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace. |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport. |
 | `ctx.liveshareShares` | `service` | [`experimental-liveshare`](../packages/experimental/liveshare) | - | - | - | Publishes the owner share-management operations as one Typert Remote namespace that the owner client face calls; every method delegates to the same operations the same-origin routes used. |
+| `ctx.agentTrace` | `service` | [`agent-trace`](../packages/review/agent-trace) | - | - | - | Folds committed Session events into activity spans, keeps whole-log counters incrementally, and persists one bounded summary per Session for a later full-trace view. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

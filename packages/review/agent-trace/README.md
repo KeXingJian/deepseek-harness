@@ -53,7 +53,14 @@ Every field is a deployment choice, so the composition states it explicitly:
 `sessionSummary(sessionId)` answers from the live incremental fold for a live Session, otherwise from the stored record. `sessionTrace(sessionId)` returns the folded spans; for a Session that is not live it reads the complete log through `sessionQuery` and refreshes the stored summary as a side effect. Both return `undefined` when the Session is neither live nor readable.
 
 ```ts
-const summary = await ctx.agentTrace.sessionSummary(sessionId)
+import type { Context } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { AgentTraceSummary } from '@deepseek-ai/dsh-agent-trace'
+
+declare const ctx: Context
+declare const sessionId: SessionId
+
+const summary: AgentTraceSummary | undefined = await ctx.agentTrace.sessionSummary(sessionId)
 const spans = await ctx.agentTrace.sessionTrace(sessionId)
 ```
 

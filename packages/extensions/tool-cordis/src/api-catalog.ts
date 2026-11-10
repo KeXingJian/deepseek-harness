@@ -397,20 +397,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'agentTrace',
-    summary: 'The trace collection service.',
-    description: 'The trace collection service. Mount it beside `sessions`, the storage stack, and (optionally) `sessionQuery`; every method is read-only for callers and persistence is fail-soft, because a lost summary costs one interactive recompute and must never disturb the Session append path.',
+    summary: 'trace 采集服务。将它挂载在 `sessions`、存储栈以及（可选的）`sessionQuery` 旁边； 对调用方而言每个方法都是只读的，持久化采用失败软化（fail-soft）策略，因为丢失 摘要只付出一次交互式重算的代价，绝不能干扰 Session 的追加路径。',
+    description: 'trace 采集服务。将它挂载在 `sessions`、存储栈以及（可选的）`sessionQuery` 旁边； 对调用方而言每个方法都是只读的，持久化采用失败软化（fail-soft）策略，因为丢失 摘要只付出一次交互式重算的代价，绝不能干扰 Session 的追加路径。',
     methods: [
       {
         signature: 'async sessionSummary(sessionId: SessionId): Promise<AgentTraceSummary | undefined>',
-        description: 'Read one Session\'s whole-log activity summary.',
-        parameters: [{ name: 'sessionId', description: 'live or persisted Session identity.' }],
-        returns: 'the summary and the log position it folded through, or undefined when the Session is neither live nor readable through `sessionQuery`.',
+        description: '读取单个 Session 全日志的活动摘要。',
+        parameters: [{ name: 'sessionId', description: '活跃或已持久化的 Session 标识。' }],
+        returns: '该摘要及其折叠到的日志位置；当该 Session 既非活跃、也无法通过 `sessionQuery` 读取时返回 undefined。',
       },
       {
         signature: 'async sessionTrace(sessionId: SessionId): Promise<readonly ActivitySpan[] | undefined>',
-        description: 'Read one Session\'s folded activity spans.',
-        parameters: [{ name: 'sessionId', description: 'live or persisted Session identity.' }],
-        returns: 'the spans in sequence order, or undefined when the Session is neither live nor readable through `sessionQuery`. A cold read also refreshes the stored summary as a side effect.',
+        description: '读取单个 Session 折叠后的活动 span。',
+        parameters: [{ name: 'sessionId', description: '活跃或已持久化的 Session 标识。' }],
+        returns: '按序号排列的 span；当该 Session 既非活跃、也无法通过 `sessionQuery` 读取时返回 undefined。冷读还会顺带刷新已存储的摘要。',
       },
     ],
   },

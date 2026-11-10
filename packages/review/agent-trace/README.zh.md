@@ -53,7 +53,14 @@ kind: "package-reference"
 对活动会话，`sessionSummary(sessionId)` 直接读实时增量折叠；否则读已存记录。<br>`sessionTrace(sessionId)` 返回折叠后的 span；对非活动会话，它通过 `sessionQuery` 读取完整日志，并顺带刷新已存摘要。<br>当会话既不活动也不可读时，两者都返回 `undefined`。
 
 ```ts
-const summary = await ctx.agentTrace.sessionSummary(sessionId)
+import type { Context } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { AgentTraceSummary } from '@deepseek-ai/dsh-agent-trace'
+
+declare const ctx: Context
+declare const sessionId: SessionId
+
+const summary: AgentTraceSummary | undefined = await ctx.agentTrace.sessionSummary(sessionId)
 const spans = await ctx.agentTrace.sessionTrace(sessionId)
 ```
 

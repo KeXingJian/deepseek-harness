@@ -222,22 +222,21 @@ export interface Config {
 ## `@deepseek-ai/dsh-agent-trace`
 
 - `inject`: `sessions` · `storageDomain`
-- `source`: [`packages/review/agent-trace/src/index.ts:42`](../packages/review/agent-trace/src/index.ts)
+- `source`: [`packages/review/agent-trace/src/index.ts:38`](../packages/review/agent-trace/src/index.ts)
 
 ```ts config-catalog
 /**
- * Plugin config. Every field is a deployment choice with no universally
- * correct value: write cadence bounds how much work a crash can lose, and the
- * retention pair bounds how much storage the silent collection may occupy.
+ * 插件配置。每个字段都是部署选择，不存在普遍正确的取值：写入节奏限制了崩溃时可能
+ * 丢失的工作量，而两个保留参数限制了这一静默采集可占用的存储量。
  */
 export interface Config {
-  /** Recorded events per Session that force a summary write between mandatory points. */
+  /** 每个 Session 记录的事件数阈值；达到该值后会在强制写入点之间强制写一次摘要。 */
   flushEveryEvents: number
-  /** Longest time (milliseconds) a dirty summary may stay unwritten between mandatory points. */
+  /** 脏摘要在强制写入点之间可保持未写入的最长时间（毫秒）。 */
   flushIntervalMs: number
-  /** Age (days) after which a stored summary is pruned on the next collection write. */
+  /** 存储摘要的存活时长（天）；超过后会在下一次采集写入时被清理。 */
   retentionDays: number
-  /** Maximum stored summaries; the oldest are pruned beyond this count. */
+  /** 存储摘要的数量上限；超过该数量后最旧的会被清理。 */
   maxRecords: number
 }
 ```

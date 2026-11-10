@@ -19,9 +19,9 @@ export interface ActivitySpan {
   /** 该跨度的结束状态。 */
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
   /**
-   * 采集层附加到该跨度上的展示信息：模型给出的工具参数、bash 删除操作派生的
-   * `path` 和 `op`、回合的单行 `intent`，以及在检查视图中定位某次工具调用的
-   * 已记录 `callId`。
+   * 采集层附加到该跨度上的展示信息：模型给出的工具参数（目标文件统一记为
+   * `path`）、文件变更工具上报或 bash 删除派生的 `op`、回合的单行 `intent`，
+   * 以及在检查视图中定位某次工具调用的已记录 `callId`。
    */
   readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined
 }

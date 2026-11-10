@@ -11,25 +11,24 @@
 span 是一段有计时的工作单元，带结算状态和 Session 记录下来的评审相关事实。span 按开启它的事件序号排序；`seq` 就是读者在轨迹里对照的位置。
 
 ```ts type-equiv
-/** One folded activity span produced by the collection layer. */
+/** 采集层生成的一个折叠后的活动跨度。 */
 interface ActivitySpan {
-  /** Sequence number of the span's first contributing session event. */
+  /** 该跨度首个贡献会话事件的序号。 */
   readonly seq: number
-  /** Span family that owns the timing. */
+  /** 计时所属的跨度类别。 */
   readonly kind: 'turn' | 'step' | 'request' | 'tool' | 'subagent' | 'workflow' | 'compaction'
-  /** Tool name, workflow phase, subagent label, or turn label. */
+  /** 工具名、工作流阶段、子代理标签或回合标签。 */
   readonly name: string
-  /** Epoch milliseconds at which the span opened. */
+  /** 跨度开启时的纪元毫秒数。 */
   readonly startTime: number
-  /** Epoch milliseconds at which the span closed; absent while it runs. */
+  /** 跨度关闭时的纪元毫秒数；跨度运行期间不存在。 */
   readonly endTime?: number | undefined
-  /** Settlement state of the span. */
+  /** 该跨度的结束状态。 */
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
   /**
-   * Presentation facts the collection layer attached to this span: the model's
-   * tool arguments, a bash removal's derived `path` and `op`, the turn's
-   * one-line `intent`, and the recorded `callId` that addresses a tool call in
-   * an inspection view.
+   * 采集层附加到该跨度上的展示信息：模型给出的工具参数（目标文件统一记为
+   * `path`）、文件变更工具上报或 bash 删除派生的 `op`、回合的单行 `intent`，
+   * 以及在检查视图中定位某次工具调用的已记录 `callId`。
    */
   readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined
 }
@@ -38,13 +37,13 @@ interface ActivitySpan {
 `ActivitySummary` 为那些永远不展开 span 列表的视图统计同一批 span。一次折叠通过与 span 列表相同的开启/结算转移推进它，因此增量构造出的摘要与对最终列表调用 `summarizeSpans()` 的结果始终一致。
 
 ```ts type-equiv
-/** Whole-log counters derived from spans, carried incrementally by the fold. */
+/** 由跨度推导出的全日志计数器，由折叠过程增量维护。 */
 interface ActivitySummary {
-  /** Opening counts by span family. */
+  /** 按跨度类别统计的开启次数。 */
   readonly spansByKind: Readonly<Record<ActivitySpan['kind'], number>>
-  /** Current settlement counts; `running` counts spans still open. */
+  /** 当前的结束状态计数；`running` 统计仍处于打开状态的跨度。 */
   readonly spansByStatus: Readonly<Record<ActivitySpan['status'], number>>
-  /** Summed wall time of settled spans by family, in milliseconds. */
+  /** 按类别统计的已结束跨度实际耗时之和，单位为毫秒。 */
   readonly durationByKind: Readonly<Record<ActivitySpan['kind'], number>>
 }
 ```
@@ -56,17 +55,17 @@ interface ActivitySummary {
 卡片按固定顺序回答评审者的问题；风险标记在卡片之后计算，因此被标记的改动会显示为 warning，而不会改动它来自的 span。`evidenceSeqs` 让每张卡都可核对：不信任某张卡的读者可以打开它依据的序号。
 
 ```ts type-equiv
-/** The six card kinds a review reader can see. */
+/** 评审者可见的六种卡片类别。 */
 type ChainKind = 'intent' | 'recon' | 'change' | 'verify' | 'interrupt' | 'result'
 ```
 
 ```ts type-equiv
-/** Visual state of one chain card. */
+/** 单张链路卡片的视觉状态。 */
 type ChainStatus = 'ok' | 'error' | 'running' | 'warning'
 ```
 
 ```ts type-equiv
-/** File operation one change card records. */
+/** 一张变更卡片记录的文件操作。 */
 type ChangeOp = 'create' | 'update' | 'delete'
 ```
 
@@ -74,55 +73,54 @@ type ChangeOp = 'create' | 'update' | 'delete'
 
 ```ts type-equiv
 /**
- * One card title: the message the presentation layer renders together with the
- * values it interpolates. Recorded text stays verbatim; every other variant
- * names a message the reader's locale dictionary owns.
+ * 一张卡片的标题：展示层渲染的消息，以及该消息插值所用的值。已记录的文本保持
+ * 原样；其他每种变体只指明一条由读者所在语言字典提供的消息。
  */
 type ChainTitle =
-  /** The turn's own intent sentence, shown as recorded. */
+  /** 回合自身的意图语句，按记录原样展示。 */
   | { readonly copy: 'intent'; readonly text: string }
-  /** Look-around work merged into counted totals. */
+  /** 被合并为计数总计的探查类工作。 */
   | { readonly copy: 'recon'; readonly files: number; readonly searches: number }
-  /** Look-around compressed to reach the display ceiling. */
+  /** 为达到展示上限而被压缩的探查类工作。 */
   | { readonly copy: 'reconCollapsed' }
-  /** One subagent hand-off. */
+  /** 一次子代理交接。 */
   | { readonly copy: 'subagent'; readonly name: string }
-  /** One workflow phase that settled normally. */
+  /** 一个正常结束的工作流阶段。 */
   | { readonly copy: 'workflowCompleted'; readonly name: string }
-  /** One workflow phase that settled in error. */
+  /** 一个以错误结束的工作流阶段。 */
   | { readonly copy: 'workflowFailed'; readonly name: string }
-  /** A tool call that handed control to a human. */
+  /** 一次将控制权交给人的工具调用。 */
   | { readonly copy: 'interrupt'; readonly seconds: number }
-  /** One file creation, modification, or deletion. */
+  /** 一次文件创建、修改或删除。 */
   | { readonly copy: 'change'; readonly op: ChangeOp; readonly path: string }
-  /** A command that settled normally. */
+  /** 一条正常结束的命令。 */
   | { readonly copy: 'verifyPassed'; readonly command: string }
-  /** A command that settled in error, with the failure code when one was recorded. */
+  /** 一条以错误结束的命令；若记录了失败码，则一并给出。 */
   | { readonly copy: 'verifyFailed'; readonly command: string; readonly errorCode?: string | undefined }
-  /** A folded run of successful verifications. */
+  /** 一段被折叠的连续成功校验。 */
   | { readonly copy: 'verifyRun'; readonly count: number }
-  /** The closing summary of changed files and verifications. */
+  /** 变更文件与校验的收尾汇总。 */
   | { readonly copy: 'result'; readonly files: number; readonly verifications: number }
 ```
 
 ```ts type-equiv
-/** One readable step of the execution chain. */
+/** 执行链中一个可读的步骤。 */
 interface ChainCard {
-  /** Stable identifier derived from the kind and first contributing sequence. */
+  /** 由类别与首个贡献序号推导出的稳定标识符。 */
   readonly id: string
-  /** Presentation kind. */
+  /** 展示类别。 */
   readonly kind: ChainKind
-  /** One-line summary shown without expansion, for the presentation layer to localize. */
+  /** 未展开时显示的单行摘要，由展示层负责本地化。 */
   readonly title: ChainTitle
-  /** Epoch milliseconds at which the card opened. */
+  /** 卡片开启时的纪元毫秒数。 */
   readonly startedAt: number
-  /** Visual state derived from the underlying spans and risk flags. */
+  /** 由底层跨度与风险标记推导出的视觉状态。 */
   readonly status: ChainStatus
-  /** Sequence numbers a reader can open to check the card. */
+  /** 评审者可打开以核对这张卡片的序号。 */
   readonly evidenceSeqs: readonly number[]
-  /** Number of merged occurrences, for repeated work on one target. */
+  /** 合并后的出现次数，用于同一目标上的重复工作。 */
   readonly repeat?: number | undefined
-  /** Machine facts the presentation layer can read without parsing titles. */
+  /** 展示层无需解析标题即可读取的机器可读信息。 */
   readonly meta?: Readonly<Record<string, string | number>> | undefined
 }
 ```
@@ -130,12 +128,12 @@ interface ChainCard {
 `meta` 以机器可读形式携带同一批记录事实——目标路径、命令、工具名、操作和合并后的计数。展开的卡片用本地化字段名列出它们，风险规则也读取它们而不是解析标题。
 
 ```ts type-equiv
-/** Severity of a review risk flag. */
+/** 评审风险标记的严重程度。 */
 type RiskSeverity = 'danger' | 'warn' | 'info'
 ```
 
 ```ts type-equiv
-/** One rule's finding: the message the presentation layer localizes, plus its counts. */
+/** 单条规则的发现：由展示层本地化的消息，以及相应计数。 */
 type RiskReason =
   | { readonly copy: 'touchesTests' }
   | { readonly copy: 'touchesCi' }
@@ -147,15 +145,15 @@ type RiskReason =
 ```
 
 ```ts type-equiv
-/** One review risk attached to the chain. */
+/** 附加到链路上的一项评审风险。 */
 interface RiskFlag {
-  /** Stable rule name. */
+  /** 稳定的规则名。 */
   readonly code: string
-  /** How strongly the flag blocks a confident review. */
+  /** 该标记对可靠评审的阻断程度。 */
   readonly severity: RiskSeverity
-  /** Reader-facing reason, for the presentation layer to localize. */
+  /** 面向评审者的原因，由展示层负责本地化。 */
   readonly reason: RiskReason
-  /** Files the rule matched. */
+  /** 该规则匹配到的文件。 */
   readonly evidenceFiles: readonly string[]
 }
 ```
@@ -165,13 +163,13 @@ interface RiskFlag {
 已存储的摘要会说明它覆盖到哪个日志位置，因此消费方可以区分当前答案与过期答案，也能区分实时折叠与恢复记录。
 
 ```ts type-equiv
-/** One Session's summary as a consumer reads it. */
+/** 消费者读取时看到的单个 Session 摘要。 */
 interface AgentTraceSummary {
-  /** Fold semantics that produced the summary; compare with the exported constant. */
+  /** 产出该摘要的折叠语义；请与导出的常量比较。 */
   readonly traceVersion: number
-  /** Last Session event sequence folded into the summary. */
+  /** 已折叠进该摘要的最后一个 Session 事件序号。 */
   readonly asOfSeq: number
-  /** The whole-log counters at {@link AgentTraceSummary.asOfSeq}. */
+  /** 处于 {@link AgentTraceSummary.asOfSeq} 时的全日志计数。 */
   readonly summary: ActivitySummary
 }
 ```
@@ -190,23 +188,22 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.agentTrace` — `AgentTrace`
 
-The trace collection service. Mount it beside `sessions`, the storage stack, and (optionally) `sessionQuery`; every method is read-only for callers and persistence is fail-soft, because a lost summary costs one interactive recompute and must never disturb the Session append path.
+trace 采集服务。将它挂载在 `sessions`、存储栈以及（可选的）`sessionQuery` 旁边； 对调用方而言每个方法都是只读的，持久化采用失败软化（fail-soft）策略，因为丢失 摘要只付出一次交互式重算的代价，绝不能干扰 Session 的追加路径。
 
 ```ts cordis-catalog
 /**
- * Read one Session's whole-log activity summary.
- * @param sessionId - live or persisted Session identity.
- * @returns the summary and the log position it folded through, or undefined
- *   when the Session is neither live nor readable through `sessionQuery`.
+ * 读取单个 Session 全日志的活动摘要。
+ * @param sessionId - 活跃或已持久化的 Session 标识。
+ * @returns 该摘要及其折叠到的日志位置；当该 Session 既非活跃、也无法通过
+ *   `sessionQuery` 读取时返回 undefined。
  */
 async sessionSummary(sessionId: SessionId): Promise<AgentTraceSummary | undefined>
 
 /**
- * Read one Session's folded activity spans.
- * @param sessionId - live or persisted Session identity.
- * @returns the spans in sequence order, or undefined when the Session is
- *   neither live nor readable through `sessionQuery`. A cold read also
- *   refreshes the stored summary as a side effect.
+ * 读取单个 Session 折叠后的活动 span。
+ * @param sessionId - 活跃或已持久化的 Session 标识。
+ * @returns 按序号排列的 span；当该 Session 既非活跃、也无法通过 `sessionQuery`
+ *   读取时返回 undefined。冷读还会顺带刷新已存储的摘要。
  */
 async sessionTrace(sessionId: SessionId): Promise<readonly ActivitySpan[] | undefined>
 ```

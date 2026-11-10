@@ -29,6 +29,9 @@ kind: "package-reference"
 
 ```ts
 import { chainFromSpans } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan } from '@deepseek-ai/dsh-agent-activity'
+
+declare const spans: readonly ActivitySpan[]
 
 const { cards, flags } = chainFromSpans(spans, '请修复排序的空数组问题')
 ```
@@ -39,6 +42,9 @@ const { cards, flags } = chainFromSpans(spans, '请修复排序的空数组问�
 
 ```ts
 import { chainFromSpans, foldActivity } from '@deepseek-ai/dsh-agent-activity'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
+
+declare const events: readonly SessionEvent[]
 
 const { cards, flags } = chainFromSpans(foldActivity(events))
 ```

@@ -30,8 +30,22 @@ export interface ActivityState {
   summary: ActivitySummary
 }
 
-/** 评审链路会读取的参数键。 */
-const READ_ARGUMENTS = ['path', 'file', 'command', 'pattern', 'op'] as const
+/**
+ * 工具参数中承载目标文件路径的键，按优先级排列。
+ *
+ * 文件系统工具（`read`、`write`、`edit`、`read_image`）用 `file_path`，检索类工具与
+ * 其他工具用 `path` 或 `file`；统一记录为 `path`，投影层只认这一个键。
+ */
+const PATH_ARGUMENTS = ['path', 'file_path', 'file', 'target_file'] as const
+
+/** 评审链路会读取的其他参数键。 */
+const READ_ARGUMENTS = ['command', 'pattern', 'op'] as const
+
+/** 文件变更工具在 `tool/result` 的私有 `meta` 中上报的操作类型。 */
+const MUTATION_OPERATIONS: ReadonlySet<string> = new Set(['create', 'update', 'delete'])
+
+/** 工具结果的私有 `meta` 负载，按事件类型取出以免复制其形状定义。 */
+type ToolResultMeta = Extract<SessionEvent, { type: 'tool/result' }>['data']['meta']
 
 /** shell 删除命令的目标；当命令未指明操作数时，返回命令本身。 */
 function removalTarget(command: string): string | undefined {
@@ -57,11 +71,32 @@ function attributesOf(argumentsJson: string): MutableAttributes {
   }
   if (typeof parsed !== 'object' || parsed === null) return {}
   const attributes: MutableAttributes = {}
+  for (const key of PATH_ARGUMENTS) {
+    const value = argumentString(parsed, key)
+    if (value === undefined) continue
+    attributes.path = value
+    break
+  }
   for (const key of READ_ARGUMENTS) {
     const value = argumentString(parsed, key)
     if (value !== undefined) attributes[key] = value
   }
   return attributes
+}
+
+/**
+ * 读取文件变更工具在 `tool/result` 的 `meta` 中上报的操作类型。
+ *
+ * `meta` 的负载由生产工具拥有（当前是 `dsh-tool-fs` 的 `{ diffs, operation }`），
+ * 此处只取评审需要的字段；形状不符时视为未上报，而不是推断。
+ * @param meta - 工具结果事件的可选私有负载。
+ * @returns 已上报的操作类型，未上报时为 undefined。
+ */
+function operationOf(meta: ToolResultMeta): 'create' | 'update' | 'delete' | undefined {
+  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return undefined
+  const operation = meta['operation']
+  if (typeof operation !== 'string' || !MUTATION_OPERATIONS.has(operation)) return undefined
+  return operation as 'create' | 'update' | 'delete'
 }
 
 /** 将回合结束原因映射为跨度状态。 */
@@ -208,9 +243,15 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
       const index = state.openCalls[key]
       const span = index === undefined ? undefined : state.spans[index]
       if (index === undefined || span === undefined) return state
-      const attributes = event.data.error === undefined
+      const errorCode = event.data.error === undefined ? undefined : event.data.error.code
+      const operation = operationOf(event.data.meta)
+      const attributes = errorCode === undefined && operation === undefined
         ? span.attributes
-        : { ...span.attributes, errorCode: event.data.error.code }
+        : {
+          ...span.attributes,
+          ...(errorCode === undefined ? {} : { errorCode }),
+          ...(operation === undefined ? {} : { op: operation }),
+        }
       return {
         ...closed(state, index, span, {
           ...span,
