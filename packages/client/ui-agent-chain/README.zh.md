@@ -29,13 +29,13 @@ kind: "package-reference"
 
 ### 阅读执行链
 
-每行包含状态点、卡片类型、一行标题；投影合并了重复工作时还会带上重复次数。<br>卡片类型有 `intent`、`recon`、`change`、`verify`、`interrupt`、`result`；标题由投影决定，失败卡片始终单独成卡。
+每行包含状态点、卡片类型、一行标题；投影合并了重复工作时还会带上重复次数。<br>卡片类型有 `intent`、`recon`、`change`、`verify`、`interrupt`、`result`。<br>投影把每个标题作为消息描述符提供，失败卡片始终单独成卡；措辞由本包字典拥有，并由 `chain-copy.ts` 解析。
 
 三个筛选器收窄列表：`全部`、`仅看改动`、`只看风险`。<br>`只看风险` 只保留失败与告警卡片，不影响风险条——只要投影报告了标记，风险条就一直可见。<br>筛选结果为空时显示专门的空态，而不是“还没有记录到活动”。
 
 ### 展开单张卡片
 
-展开按钮揭示卡片记录的内容：投影的详情文本、具名事实（路径、命令、工具、操作、文件数、检索数），以及每条来源 span 的一行——会话日志序号、span 名称与结算状态。<br>没有详情、事实或依据的卡片不提供展开按钮；快照里已不存在的依据序号会被跳过。
+展开按钮揭示卡片记录的内容：具名事实（路径、命令、工具、操作、文件数、检索数），以及每条来源 span 的一行——会话日志序号、span 名称与结算状态。<br>没有事实或依据的卡片不提供展开按钮；快照里已不存在的依据序号会被跳过。
 
 ### 打开卡片指向的对象
 
@@ -48,7 +48,7 @@ kind: "package-reference"
 
 - `chainDefinition` 匹配执行链读取的七种持久事件，并通过 `@deepseek-ai/dsh-agent-activity` 折叠它们。<br>每个匹配事件都作为 start 候选：引擎用已加载历史窗口里最早的事件初始化 Context，其余按 update 应用，窗口滑动时也会重新推导执行链。<br>它构建的节点同时携带折叠结果与来源 span，因此展开时可以按序号读取单条 span。
 - `chainViewDefinition` 按会话发布一份快照 —— `{ cards, flags, spans }` —— 来自 Definition 构建的节点。<br>该节点复用引擎生成的 Context key；自己手写的 key 过不了引擎的身份校验。
-- `AgentChainView` 通过槽位的 `useChain` hook 与 `t` 座位渲染快照。<br>`chain-copy.ts` 持有筛选、类型、严重级的词汇，以及展开行与依据行，因此组件里既没有文案副本，也不访问服务。<br>视图从会话视图的 owner share 收到 `inspectCall`，并用 span 记录的调用标识调用它。
+- `AgentChainView` 通过槽位的 `useChain` hook 与 `t` 座位渲染快照。<br>`chain-copy.ts` 持有筛选、类型、严重级的词汇，通过字典解析卡片标题与风险原因，并推导展开行与依据行，因此组件里既没有文案副本，也不访问服务。<br>视图从会话视图的 owner share 收到 `inspectCall`，并用 span 记录的调用标识调用它。
 - 槽位的 `inject` 面在点击时从 `sessions.list` 读取会话工作区根，把卡片路径解析为会话作用域的文件地址并通过 `sidebarRight.openResource` 打开；读取文件内容由预览自己负责。
 - 样式是一个基于 `--dsw-*` 令牌的 CSS Module；根节点宽度限制在 `--dsh-chat-content-width`，自身不滚动，滚动由会话滚动容器负责。
 
@@ -56,6 +56,7 @@ kind: "package-reference"
 ## 进一步探索
 
 - [会话视图参考](../../../docs/subsystems/conversation.zh.md) —— Definition、视图 target 与承载视图的槽位。
+- [评审活动链](../../../docs/subsystems/review-chain.zh.md) —— 本视图渲染的 span 与卡片类型，以及其字典解析的消息。
 - [`dsh-agent-activity`](../../review/agent-activity/README.zh.md) —— 本视图渲染的 span 折叠、六类卡片与风险规则。
 - [`dsh-client-ui-primitives`](../ui-primitives/README.zh.md) —— 本视图组合的 `Pill`、`Tag`、`StateDot`。
 
@@ -71,7 +72,7 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
-- **标题未本地化** —— 卡片标题与风险原因是 `dsh-agent-activity` 投影产出的中文常量；把它们搬进字典属于本地化收尾。
+- **计数没有单复数形式** —— 字典消息接收数字后只渲染一个模板，因此英文执行链会显示 "1 searches" 而不是单数形式。
 - **执行链自身还不能折叠** —— 所有卡片都会渲染；尚无“全部收起”或按类型分组。
 - **轮次与步骤依据不能跳转** —— 只有工具调用 span 带有“轨迹”可聚焦的调用标识，因此轮次与步骤依据行只是标签。
 

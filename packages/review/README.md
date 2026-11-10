@@ -32,6 +32,7 @@ Choosing this group means the subject is human judgment of agent work. Anything 
 <a id="related-documentation"></a>
 ## Related documentation
 
+- The [review activity chain](../../docs/subsystems/review-chain.md) records this group's span, card, risk, and persisted-summary types.
 - The [Session subsystem](../../docs/subsystems/session.md) owns the durable events a collection layer folds before this group sees them.
 - [`ui-trajectory`](../client/ui-trajectory/README.md) presents the per-record ledger; this group deliberately summarizes rather than lists.
 

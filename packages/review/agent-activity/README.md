@@ -56,6 +56,8 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 
 Cards merge while preserving review meaning: adjacent look-around cards become one counted summary, repeated edits to one file become one card with a `repeat` count, failed verifications stay standalone, and long success runs collapse. The chain is capped so a long session still fits one screen.
 
+A card title is a `ChainTitle` message descriptor — which message applies and the values it interpolates — and `meta` repeats the same facts in machine form for expansion and for the risk rules. Only an `intent` title is recorded text. The consuming view maps each descriptor through its own locale dictionary, so the projection never writes product copy.
+
 ### Risk flags
 
 | Code | Severity | Rule |
@@ -68,7 +70,7 @@ Cards merge while preserving review meaning: adjacent look-around cards become o
 | `gave-up` | warn | The same verification failed repeatedly and edits continued |
 | `plan-churn` | info | Five or more distinct intents |
 
-Every flag carries the files it matched; the presentation layer shows the reason and the evidence instead of a bare warning.
+Every flag carries a `RiskReason` message descriptor and the files it matched; the presentation layer localizes the reason and shows the evidence instead of a bare warning.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -80,6 +82,7 @@ The package is a two-step projection with no I/O and no Cordis dependencies: spa
 <a id="further-exploration"></a>
 ## Further Exploration
 
+- [Review activity chain](../../../docs/subsystems/review-chain.md) — the span, card, and risk types with their contracts.
 - [Session events](../../core/session/README.md) — the durable facts a collection layer folds into spans.
 - [Session subsystem](../../../docs/subsystems/session.md) — the event vocabulary the spans are derived from.
 - [Trajectory view](../../client/ui-trajectory/README.md) — the per-record ledger this chain deliberately summarizes instead of listing.

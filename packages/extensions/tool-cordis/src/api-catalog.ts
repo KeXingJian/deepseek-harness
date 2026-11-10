@@ -396,6 +396,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'agentTrace',
+    summary: 'The trace collection service.',
+    description: 'The trace collection service. Mount it beside `sessions`, the storage stack, and (optionally) `sessionQuery`; every method is read-only for callers and persistence is fail-soft, because a lost summary costs one interactive recompute and must never disturb the Session append path.',
+    methods: [
+      {
+        signature: 'async sessionSummary(sessionId: SessionId): Promise<AgentTraceSummary | undefined>',
+        description: 'Read one Session\'s whole-log activity summary.',
+        parameters: [{ name: 'sessionId', description: 'live or persisted Session identity.' }],
+        returns: 'the summary and the log position it folded through, or undefined when the Session is neither live nor readable through `sessionQuery`.',
+      },
+      {
+        signature: 'async sessionTrace(sessionId: SessionId): Promise<readonly ActivitySpan[] | undefined>',
+        description: 'Read one Session\'s folded activity spans.',
+        parameters: [{ name: 'sessionId', description: 'live or persisted Session identity.' }],
+        returns: 'the spans in sequence order, or undefined when the Session is neither live nor readable through `sessionQuery`. A cold read also refreshes the stored summary as a side effect.',
+      },
+    ],
+  },
+  {
     key: 'approval',
     summary: 'Approval service that applies session policy before answerers and logs every ask/outcome pair to the requesting session.',
     description: 'Approval service that applies session policy before answerers and logs every ask/outcome pair to the requesting session. It exposes deterministic policy changes to the model through the runtime-context snapshot and switch notices.',
@@ -5508,6 +5527,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ActionCardView {\n    readonly proposals: Readonly<Record<string, ActionCardProposal>>;\n    readonly decisions: Readonly<Record<string, ActionCardDecision>>;\n}',
   },
   {
+    name: 'ActivitySpan',
+    declaration: 'export interface ActivitySpan {\n    readonly seq: number;\n    readonly kind: \'turn\' | \'step\' | \'request\' | \'tool\' | \'subagent\' | \'workflow\' | \'compaction\';\n    readonly name: string;\n    readonly startTime: number;\n    readonly endTime?: number | undefined;\n    readonly status: \'running\' | \'ok\' | \'error\' | \'cancelled\' | \'interrupted\';\n    readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined;\n}',
+  },
+  {
+    name: 'ActivitySummary',
+    declaration: 'export interface ActivitySummary {\n    readonly spansByKind: Readonly<Record<ActivitySpan[\'kind\'], number>>;\n    readonly spansByStatus: Readonly<Record<ActivitySpan[\'status\'], number>>;\n    readonly durationByKind: Readonly<Record<ActivitySpan[\'kind\'], number>>;\n}',
+  },
+  {
     name: 'AdapterRegistrationHandle',
     declaration: 'export interface AdapterRegistrationHandle {\n    (): void;\n    replace(providers: string[]): void;\n}',
   },
@@ -5578,6 +5605,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AgentStatus',
     declaration: 'export type AgentStatus = \'idle\' | \'running\';',
+  },
+  {
+    name: 'AgentTraceSummary',
+    declaration: 'export interface AgentTraceSummary {\n    readonly traceVersion: number;\n    readonly asOfSeq: number;\n    readonly summary: ActivitySummary;\n}',
   },
   {
     name: 'AnalyticsPreset',

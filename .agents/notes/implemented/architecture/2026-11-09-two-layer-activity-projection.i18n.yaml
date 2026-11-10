@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-09-two-layer-activity-projection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-09-two-layer-activity-projection.md
+/agent-note-project-review-activity-twice-spans-for-collection-messages-for-presentation:
+  en: 7d05a5b2c9d44e18
+  zh: 935615647bf1fbc7
+/agent-note-project-review-activity-twice-spans-for-collection-messages-for-presentation/problem:
+  en: 90a43c47089790dd
+  zh: 0f5edf068e2a0364
+/agent-note-project-review-activity-twice-spans-for-collection-messages-for-presentation/decision:
+  en: 3f5701fb232aeab1
+  zh: e717df051e31e98e
+/agent-note-project-review-activity-twice-spans-for-collection-messages-for-presentation/alternatives-considered:
+  en: c754a3f608217f25
+  zh: e8f93f1c800518dd
+/agent-note-project-review-activity-twice-spans-for-collection-messages-for-presentation/consequences:
+  en: bc4fb7a76d6e20dc
+  zh: 086a14cfa2e4aaa3
+/agent-note-project-review-activity-twice-spans-for-collection-messages-for-presentation/verification:
+  en: e448eac8a2ceb791
+  zh: 72f35d2ad07041b1

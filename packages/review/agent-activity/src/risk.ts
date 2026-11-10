@@ -64,12 +64,12 @@ export function reviewFlags(
 
   const tests = files.filter(path => TEST_PATH.test(path))
   if (tests.length > 0) {
-    flags.push({ code: 'touches-tests', severity: 'warn', reason: '改动了测试文件', evidenceFiles: tests })
+    flags.push({ code: 'touches-tests', severity: 'warn', reason: { copy: 'touchesTests' }, evidenceFiles: tests })
   }
 
   const ci = files.filter(path => CI_PATH.test(path))
   if (ci.length > 0) {
-    flags.push({ code: 'touches-ci', severity: 'warn', reason: '改动了 CI 或构建配置', evidenceFiles: ci })
+    flags.push({ code: 'touches-ci', severity: 'warn', reason: { copy: 'touchesCi' }, evidenceFiles: ci })
   }
 
   const deleted = spans.filter(span => span.kind === 'tool' && isDeletion(span)).map(span => changePath(span))
@@ -77,7 +77,7 @@ export function reviewFlags(
     flags.push({
       code: 'deletes',
       severity: 'danger',
-      reason: `删除了 ${deleted.length} 个文件`,
+      reason: { copy: 'deletes', count: deleted.length },
       evidenceFiles: deleted,
     })
   }
@@ -94,7 +94,7 @@ export function reviewFlags(
     flags.push({
       code: 'out-of-scope',
       severity: 'info',
-      reason: '以下文件未在任务描述或勘察中出现（推断）',
+      reason: { copy: 'outOfScope' },
       evidenceFiles: suspected,
     })
   }
@@ -104,7 +104,7 @@ export function reviewFlags(
     flags.push({
       code: 'unverified',
       severity: 'danger',
-      reason: '存在改动，但没有任何通过的验证',
+      reason: { copy: 'unverified' },
       evidenceFiles: files.filter(path => path !== ''),
     })
   }
@@ -119,7 +119,7 @@ export function reviewFlags(
     flags.push({
       code: 'gave-up',
       severity: 'warn',
-      reason: '同一验证反复失败后仍在修改代码',
+      reason: { copy: 'gaveUp' },
       evidenceFiles: [...failures.keys()],
     })
   }
@@ -129,7 +129,7 @@ export function reviewFlags(
     flags.push({
       code: 'plan-churn',
       severity: 'info',
-      reason: `会话内目标变更 ${intents} 次`,
+      reason: { copy: 'planChurn', count: intents },
       evidenceFiles: [],
     })
   }

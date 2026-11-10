@@ -8,12 +8,11 @@ import { Fragment, useState } from 'react'
 import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
 import { IconChevronDownOutlineRegular, Pill, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChainSnapshot } from './chain-view.ts'
-import type { ChainEvidenceSpan, ChainFilter } from './chain-copy.ts'
+import type { ChainEvidenceSpan, ChainFilter, ChainTranslate } from './chain-copy.ts'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
-  detailRows, evidenceSpans, filterCards, isExpandable, statusDot,
+  cardTitle, detailRows, evidenceSpans, filterCards, isExpandable, riskReason, statusDot,
 } from './chain-copy.ts'
-import type { AgentChainKey } from './locales.ts'
 import css from './AgentChainView.module.css'
 
 /** Props bound by the conversation view slot. */
@@ -21,7 +20,7 @@ export interface AgentChainViewProps {
   /** Latest chain snapshot for the Session on screen. */
   readonly useChain: <S>(selector: (snapshot: ChainSnapshot) => S) => S
   /** Translate one review-chain key. */
-  readonly t: (key: AgentChainKey) => string
+  readonly t: ChainTranslate
   /** Open one workspace file in the Sidebar preview. */
   readonly openFile: (path: string) => void
   /** Open a tool call in the View that claims call focus; absent when none does. */
@@ -97,7 +96,7 @@ function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }:
       <div className={css.head}>
         <StateDot state={statusDot(card.status)} />
         <Tag tone={KIND_TONES[card.kind]} className={css.kind}>{t(KIND_KEYS[card.kind])}</Tag>
-        <span className={css.title}>{card.title}</span>
+        <span className={css.title}>{cardTitle(card, t)}</span>
         {card.repeat !== undefined && <span className={css.repeat}>{`×${String(card.repeat)}`}</span>}
         {expandable && (
           <button
@@ -113,7 +112,6 @@ function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }:
       </div>
       {open && expandable && (
         <div className={css.detail}>
-          {card.detail !== undefined && <p className={css.detailText}>{card.detail}</p>}
           {rows.length > 0 && (
             <dl className={css.meta}>
               {rows.map(row => (
@@ -169,7 +167,7 @@ export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChai
             {chain.flags.map(flag => (
               <li key={flag.code} className={css.riskItem}>
                 <Tag tone={SEVERITY_TONES[flag.severity]}>{t(SEVERITY_KEYS[flag.severity])}</Tag>
-                <span className={css.riskReason}>{flag.reason}</span>
+                <span className={css.riskReason}>{riskReason(flag, t)}</span>
                 {flag.evidenceFiles.length > 0 && (
                   <span className={css.riskFiles}>
                     {flag.evidenceFiles.map(path => (

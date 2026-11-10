@@ -32,6 +32,7 @@ kind: "package-group"
 <a id="related-documentation"></a>
 ## 相关文档
 
+- [评审活动链](../../docs/subsystems/review-chain.zh.md) 记录本组的 span、卡片、风险与持久化摘要类型。
 - [Session 子系统](../../docs/subsystems/session.zh.md) 拥有采集层折叠之前的持久事件。
 - [`ui-trajectory`](../client/ui-trajectory/README.zh.md) 呈现逐条记录台账；本组刻意做摘要而非罗列。
 

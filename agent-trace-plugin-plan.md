@@ -4,7 +4,7 @@
 > 落点：**DSH 内置 Web 插件**（Host 采集 + Client 可视化）
 > 本版定位：**简易执行链是当前核心交付**；指标采集保留为底座，全量指标视图后置。
 
-> **实施现状**：链内核已落地为 `packages/review/agent-activity`（`@deepseek-ai/dsh-agent-activity`）——6 类卡片 + 7 条风险规则，44 个测试通过、该包源码 100% 覆盖，`typecheck` / `oxlint` / 文档门禁 21 项全绿。视图层已落地为 `packages/client/ui-agent-chain`（`@deepseek-ai/dsh-client-ui-agent-chain`）：`conversation.view` 标签、6 类卡片、三种筛选、逐卡展开与风险条；P3 评审联动（文件跳转右侧栏预览、依据行跳转轨迹、卡片发布来源 span）已完成，包内 `src/client` 逐文件覆盖率 100%。P4 采集底座已落地为 `packages/review/agent-trace`（`@deepseek-ai/dsh-agent-trace`）：增量计数 + `agent_trace` 存储域有界落盘 + `sessionQuery` 冷回填，默认挂载、不接任何 UI；增量 == 全量属性测试与逐文件 100% 覆盖通过。本文其余部分保留原始规划命名（如 `trace/agent-trace`），以本行为准。
+> **实施现状**：链内核已落地为 `packages/review/agent-activity`（`@deepseek-ai/dsh-agent-activity`）——6 类卡片 + 7 条风险规则，44 个测试通过、该包源码 100% 覆盖，`typecheck` / `oxlint` / 文档门禁 21 项全绿。视图层已落地为 `packages/client/ui-agent-chain`（`@deepseek-ai/dsh-client-ui-agent-chain`）：`conversation.view` 标签、6 类卡片、三种筛选、逐卡展开与风险条；P3 评审联动（文件跳转右侧栏预览、依据行跳转轨迹、卡片发布来源 span）已完成，包内 `src/client` 逐文件覆盖率 100%。P4 采集底座已落地为 `packages/review/agent-trace`（`@deepseek-ai/dsh-agent-trace`）：增量计数 + `agent_trace` 存储域有界落盘 + `sessionQuery` 冷回填，默认挂载、不接任何 UI；增量 == 全量属性测试与逐文件 100% 覆盖通过。P5 打磨已完成：卡片标题与风险原因从中文常量改为语言无关的消息描述符（`ChainTitle` / `RiskReason`），由 `ui-agent-chain` 的 8 语言字典渲染，`--dsw-*` 令牌样式保持；三个录制用例的 golden 快照、逐变体的本地化用例、`docs/subsystems/review-chain.md` 子系统页与「两层投影」Agent Note 在同一次改动内落地。本文其余部分保留原始规划命名（如 `trace/agent-trace`），以本行为准。
 
 ---
 

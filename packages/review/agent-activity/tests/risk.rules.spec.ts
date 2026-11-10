@@ -50,7 +50,7 @@ describe('deletes', () => {
     expect(result.flags).toContainEqual(expect.objectContaining({
       code: 'deletes',
       severity: 'danger',
-      reason: '删除了 1 个文件',
+      reason: { copy: 'deletes', count: 1 },
       evidenceFiles: ['delete'],
     }))
   })
@@ -173,7 +173,7 @@ describe('ordering and empty input', () => {
     const flags = reviewFlags([], [{
       id: 'change:1',
       kind: 'change',
-      title: '修改未知文件',
+      title: { copy: 'change', op: 'update', path: '' },
       startedAt: 0,
       status: 'ok',
       evidenceSeqs: [1],

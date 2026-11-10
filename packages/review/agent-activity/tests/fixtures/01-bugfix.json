@@ -24,13 +24,13 @@
   ],
   "expected": {
     "cards": [
-      { "id": "intent:0", "kind": "intent", "title": "修复数组排序在空数组时抛错的问题", "status": "ok", "evidenceSeqs": [0] },
-      { "id": "recon:2", "kind": "recon", "title": "查看了 2 个文件，检索 1 次", "status": "ok", "evidenceSeqs": [2, 3, 4] },
-      { "id": "change:6", "kind": "change", "title": "修改 src/math.ts", "repeat": 2, "status": "ok", "evidenceSeqs": [6, 14] },
-      { "id": "verify:10", "kind": "verify", "title": "npm test 失败：ASSERTION_FAILED", "status": "error", "evidenceSeqs": [10] },
-      { "id": "intent:12", "kind": "intent", "title": "改为比较函数内处理空数组，并覆盖相等元素分支", "status": "ok", "evidenceSeqs": [12] },
-      { "id": "verify:18", "kind": "verify", "title": "npm test 通过", "status": "ok", "evidenceSeqs": [18] },
-      { "id": "result:end", "kind": "result", "title": "本次改动 1 个文件，2 次验证", "status": "ok", "evidenceSeqs": [] }
+      { "id": "intent:0", "kind": "intent", "title": { "copy": "intent", "text": "修复数组排序在空数组时抛错的问题" }, "status": "ok", "evidenceSeqs": [0] },
+      { "id": "recon:2", "kind": "recon", "title": { "copy": "recon", "files": 2, "searches": 1 }, "status": "ok", "evidenceSeqs": [2, 3, 4] },
+      { "id": "change:6", "kind": "change", "title": { "copy": "change", "op": "update", "path": "src/math.ts" }, "repeat": 2, "status": "ok", "evidenceSeqs": [6, 14] },
+      { "id": "verify:10", "kind": "verify", "title": { "copy": "verifyFailed", "command": "npm test", "errorCode": "ASSERTION_FAILED" }, "status": "error", "evidenceSeqs": [10] },
+      { "id": "intent:12", "kind": "intent", "title": { "copy": "intent", "text": "改为比较函数内处理空数组，并覆盖相等元素分支" }, "status": "ok", "evidenceSeqs": [12] },
+      { "id": "verify:18", "kind": "verify", "title": { "copy": "verifyPassed", "command": "npm test" }, "status": "ok", "evidenceSeqs": [18] },
+      { "id": "result:end", "kind": "result", "title": { "copy": "result", "files": 1, "verifications": 2 }, "status": "ok", "evidenceSeqs": [] }
     ],
     "flags": []
   }

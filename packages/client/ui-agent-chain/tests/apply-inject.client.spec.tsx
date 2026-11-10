@@ -24,16 +24,16 @@ function chainSnapshot(path: string): ChainSnapshot {
     cards: [{
       id: 'change:1',
       kind: 'change',
-      title: 'modified a.ts',
+      title: { copy: 'change', op: 'update', path },
       startedAt: 0,
       status: 'ok',
       meta: { path },
       evidenceSeqs: [7],
     }],
     flags: [{
-      code: 'tests-changed',
+      code: 'touches-tests',
       severity: 'danger',
-      reason: 'test files were modified',
+      reason: { copy: 'touchesTests' },
       evidenceFiles: ['tests/a.spec.ts'],
     }],
     spans: [{ seq: 7, kind: 'tool', name: 'bash', startTime: 0, status: 'ok', attributes: { callId: 'call-7' } }],
@@ -82,7 +82,7 @@ describe('review chain inject face', () => {
     expect(b.binding).toHaveBeenCalledWith(ROOT)
     expect(b.chainView().getByText('No activity recorded yet')).toBeTruthy()
     act(() => { b.chain.set(chainSnapshot('src/a.ts')) })
-    expect(b.chainView().getByText('modified a.ts')).toBeTruthy()
+    expect(b.chainView().getByText('src/a.ts modified')).toBeTruthy()
     await b.runtime.dispose()
   })
 

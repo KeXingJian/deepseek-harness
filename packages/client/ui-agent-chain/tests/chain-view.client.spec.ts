@@ -15,15 +15,15 @@ const CHAIN: ChainSnapshot = {
   cards: [{
     id: 'intent:1',
     kind: 'intent',
-    title: 'inspect the catalog module',
+    title: { copy: 'intent', text: 'inspect the catalog module' },
     startedAt: 1_000,
     status: 'ok',
     evidenceSeqs: [1],
   }],
   flags: [{
-    code: 'tests-changed',
+    code: 'touches-tests',
     severity: 'danger',
-    reason: 'test files were modified',
+    reason: { copy: 'touchesTests' },
     evidenceFiles: ['tests/a.spec.ts'],
   }],
   spans: [{ seq: 1, kind: 'turn', name: 'turn:1', startTime: 1_000, status: 'ok' }],

@@ -16,15 +16,15 @@
   ],
   "expected": {
     "cards": [
-      { "id": "intent:0", "kind": "intent", "title": "为 parse 增加空输入处理，并补上对应测试", "status": "ok", "evidenceSeqs": [0] },
-      { "id": "recon:2", "kind": "recon", "title": "查看了 1 个文件", "status": "ok", "evidenceSeqs": [2] },
-      { "id": "change:4", "kind": "change", "title": "新建 tests/parse.test.ts", "status": "warning", "evidenceSeqs": [4] },
-      { "id": "change:6", "kind": "change", "title": "修改 src/parse.ts", "status": "ok", "evidenceSeqs": [6] },
-      { "id": "verify:9", "kind": "verify", "title": "npm test 通过", "status": "ok", "evidenceSeqs": [9] },
-      { "id": "result:end", "kind": "result", "title": "本次改动 2 个文件，1 次验证", "status": "ok", "evidenceSeqs": [] }
+      { "id": "intent:0", "kind": "intent", "title": { "copy": "intent", "text": "为 parse 增加空输入处理，并补上对应测试" }, "status": "ok", "evidenceSeqs": [0] },
+      { "id": "recon:2", "kind": "recon", "title": { "copy": "recon", "files": 1, "searches": 0 }, "status": "ok", "evidenceSeqs": [2] },
+      { "id": "change:4", "kind": "change", "title": { "copy": "change", "op": "create", "path": "tests/parse.test.ts" }, "status": "warning", "evidenceSeqs": [4] },
+      { "id": "change:6", "kind": "change", "title": { "copy": "change", "op": "update", "path": "src/parse.ts" }, "status": "ok", "evidenceSeqs": [6] },
+      { "id": "verify:9", "kind": "verify", "title": { "copy": "verifyPassed", "command": "npm test" }, "status": "ok", "evidenceSeqs": [9] },
+      { "id": "result:end", "kind": "result", "title": { "copy": "result", "files": 2, "verifications": 1 }, "status": "ok", "evidenceSeqs": [] }
     ],
     "flags": [
-      { "code": "touches-tests", "severity": "warn", "reason": "改动了测试文件", "evidenceFiles": ["tests/parse.test.ts"] }
+      { "code": "touches-tests", "severity": "warn", "reason": { "copy": "touchesTests" }, "evidenceFiles": ["tests/parse.test.ts"] }
     ]
   }
 }

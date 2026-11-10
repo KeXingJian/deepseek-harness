@@ -2781,6 +2781,61 @@
       "doc": "docs/subsystems/forge.md",
       "symbol": "ForgeReviewResult",
       "source": "packages/experimental/forge/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ActivitySpan",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ActivitySummary",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChainKind",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChainStatus",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChangeOp",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChainTitle",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChainCard",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "RiskSeverity",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "RiskReason",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "RiskFlag",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "AgentTraceSummary",
+      "source": "packages/review/agent-trace/src/index.ts"
     }
   ]
 }

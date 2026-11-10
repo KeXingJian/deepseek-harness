@@ -12,6 +12,7 @@
     { "path": "../../api/session-controller/tsconfig.client.json" },
     { "path": "../../core/session" },
     { "path": "../../review/agent-activity" },
+    { "path": "../../util/values" },
     { "path": "../../util/workspace-path" },
     { "path": "../locale/tsconfig.client.json" },
     { "path": "../ui-conversation/tsconfig.client.json" },

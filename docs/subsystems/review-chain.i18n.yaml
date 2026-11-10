@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for review-chain.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/review-chain.md
+/review-activity-chain:
+  en: 9f2332ae6d9bffef
+  zh: 3199323d6524c429
+/review-activity-chain/collection-layer:
+  en: ba6c5e2563057ced
+  zh: 2496e19937ce2e59
+/review-activity-chain/presentation-layer:
+  en: 8286bdfc9b62393f
+  zh: e6aad6fdab36d75c
+/review-activity-chain/persisted-summary:
+  en: c516eedeeb421f2e
+  zh: d0f1d0fa22044cf1

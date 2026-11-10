@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { chainFromSpans } from '../src/index.ts'
-import type { ActivitySpan, ChainCard, RiskFlag } from '../src/index.ts'
+import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag } from '../src/index.ts'
 
 /** One recorded review case: spans in, cards and flags out. */
 interface GoldenCase {
@@ -11,7 +11,7 @@ interface GoldenCase {
     readonly cards: ReadonlyArray<{
       readonly id: string
       readonly kind: string
-      readonly title: string
+      readonly title: ChainTitle
       readonly status: string
       readonly evidenceSeqs: readonly number[]
       readonly repeat?: number

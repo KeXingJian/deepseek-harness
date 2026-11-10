@@ -56,6 +56,8 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 
 合并规则保留评审语义：相邻的勘察卡合成一张计数摘要，同一文件的重复修改合成一张并带 `repeat` 次数，失败验证永不合并，连续成功验证折叠为一张。整条链有上限，长会话仍能一屏读完。
 
+卡片标题是 `ChainTitle` 消息描述符——说明适用哪条消息以及要插值的值——`meta` 则以机器可读形式重复同一批事实，供展开与风险规则使用。只有 `intent` 标题是记录下来的文本。消费视图通过自己的语言字典映射每个描述符，因此投影从不书写产品文案。
+
 ### 风险标记
 
 | 标识 | 级别 | 规则 |
@@ -68,7 +70,7 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 | `gave-up` | warn | 同一验证反复失败后仍在继续修改 |
 | `plan-churn` | info | 出现五个及以上不同意图 |
 
-每个标记都带上命中的文件；展示层给出原因与证据，而不是一个没有依据的警告。
+每个标记都带上 `RiskReason` 消息描述符和命中的文件；展示层本地化原因并给出证据，而不是一个没有依据的警告。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -80,6 +82,7 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 <a id="further-exploration"></a>
 ## 延伸阅读
 
+- [评审活动链](../../../docs/subsystems/review-chain.zh.md) —— span、卡片与风险类型及其约定。
 - [Session 事件](../../core/session/README.zh.md) —— 采集层折叠成 span 的持久事实。
 - [Session 子系统](../../../docs/subsystems/session.zh.md) —— span 所依据的事件词汇。
 - [Trajectory 视图](../../client/ui-trajectory/README.zh.md) —— 逐条记录台账；本链刻意做它的摘要而非复刻。

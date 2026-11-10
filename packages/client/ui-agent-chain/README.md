@@ -29,13 +29,13 @@ Mount the plugin beside `ui-conversation`, `ui-renderer`, and `ui-primitives`; i
 
 ### Reading the chain
 
-Each row shows a status dot, the card kind, one title line, and — when the projection merged repeated work — a repeat count. The card kinds are `intent`, `recon`, `change`, `verify`, `interrupt`, and `result`; the projection owns their titles and keeps failures on their own cards.
+Each row shows a status dot, the card kind, one title line, and — when the projection merged repeated work — a repeat count. The card kinds are `intent`, `recon`, `change`, `verify`, `interrupt`, and `result`. The projection supplies each title as a message descriptor and keeps failures on their own cards; this package's dictionary owns the wording, and `chain-copy.ts` resolves it.
 
 Three filters narrow the list: `All`, `Changes only`, and `Risks only`. `Risks only` keeps failed and warned cards, not the risk banner, which stays visible whenever the projection reports flags. A filter that matches nothing shows its own empty line rather than the waiting state.
 
 ### Expanding one card
 
-The disclosure button reveals what the card recorded: the projection's detail text, its named facts (path, command, tool, operation, file count, search count), and one row per contributing span with its session-log sequence, span name, and settlement. Cards without recorded facts, details, or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
+The disclosure button reveals what the card recorded: its named facts (path, command, tool, operation, file count, search count) and one row per contributing span with its session-log sequence, span name, and settlement. Cards without recorded facts or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
 
 ### Opening what a card names
 
@@ -48,7 +48,7 @@ The plugin contributes four things in `apply`: the `agentChain` dictionary, one 
 
 - `chainDefinition` matches the seven durable event types the chain reads and folds them through `@deepseek-ai/dsh-agent-activity`. Every matched event is offered as a start candidate: the engine starts the Context from the earliest retained event of the loaded history window and applies the rest as updates, which also re-derives the chain when the window slides. The built node carries the folded chain and the spans it was folded from, so expansion can read one span by sequence.
 - `chainViewDefinition` publishes one snapshot per Session — `{ cards, flags, spans }` — from the node the Definition builds. The node reuses the engine-owned Context key; a hand-written key fails the engine's identity check.
-- `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. `chain-copy.ts` holds the filter, kind, and severity vocabulary plus the expansion rows and evidence rows, so the component keeps no copy and no service access. The view receives `inspectCall` from the conversation view owner share and calls it with a span's recorded call identity.
+- `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. `chain-copy.ts` holds the filter, kind, and severity vocabulary, resolves a card title and a risk reason through the dictionary, and derives the expansion and evidence rows, so the component keeps no copy and no service access. The view receives `inspectCall` from the conversation view owner share and calls it with a span's recorded call identity.
 - The slot's `inject` face resolves a card's path against the Session's workspace root — read from `sessions.list` at click time — and opens it through `sidebarRight.openResource` as a Session-scoped file address; the file preview owns reading the content.
 - Styling is a CSS Module over `--dsw-*` tokens; the root bounds itself to `--dsh-chat-content-width` and never scrolls on its own, because the conversation scrollport owns scrolling.
 
@@ -56,6 +56,7 @@ The plugin contributes four things in `apply`: the `agentChain` dictionary, one 
 ## Further Exploration
 
 - [Conversation view reference](../../../docs/subsystems/conversation.md) — Definitions, view targets, and the slot that hosts a view.
+- [Review activity chain](../../../docs/subsystems/review-chain.md) — the span and card types this view renders and the messages its dictionary resolves.
 - [`dsh-agent-activity`](../../review/agent-activity/README.md) — the span fold, the six card kinds, and the risk rules this view renders.
 - [`dsh-client-ui-primitives`](../ui-primitives/README.md) — `Pill`, `Tag`, and `StateDot`, the controls this view composes.
 
@@ -70,7 +71,7 @@ None.
 
 ## Known Limitations and Deferred Work
 
-- **Titles are not localized** — card titles and flag reasons come from the `dsh-agent-activity` projection, which still writes them as Chinese literals; moving that copy into a dictionary belongs to the localization pass.
+- **Counts interpolate without plural forms** — a dictionary message receives the number and renders one template, so an English chain reads "1 searches" rather than a singular form.
 - **No folding of the chain itself** — every card renders; there is no "collapse all" or per-kind grouping yet.
 - **Turn and step evidence does not navigate** — only a tool-call span carries the call identity Trajectory can focus, so a turn or step row stays a label.
 

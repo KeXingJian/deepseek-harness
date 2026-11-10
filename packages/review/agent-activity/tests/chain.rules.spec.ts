@@ -32,7 +32,7 @@ describe('intent cards', () => {
   it('truncates a long intent to sixty characters', () => {
     const intent = 'x'.repeat(80)
     const result = chainFromSpans([span(1, 'turn', 'turn:1', { attributes: { intent } })])
-    expect(result.cards[0]?.title).toHaveLength(60)
+    expect(result.cards[0]?.title).toEqual({ copy: 'intent', text: intent.slice(0, 60) })
   })
 })
 
@@ -43,8 +43,8 @@ describe('non-tool cards', () => {
       span(2, 'subagent', 'reviewer', { status: 'error' }),
     ])
     expect(result.cards.slice(0, 2)).toMatchObject([
-      { kind: 'recon', title: '交给子代理：explorer', status: 'ok' },
-      { kind: 'recon', title: '交给子代理：reviewer', status: 'error' },
+      { kind: 'recon', title: { copy: 'subagent', name: 'explorer' }, status: 'ok' },
+      { kind: 'recon', title: { copy: 'subagent', name: 'reviewer' }, status: 'error' },
     ])
   })
 
@@ -54,8 +54,8 @@ describe('non-tool cards', () => {
       span(2, 'workflow', 'fix', { status: 'error' }),
     ])
     expect(result.cards.slice(0, 2)).toMatchObject([
-      { kind: 'verify', title: 'scan 完成', status: 'ok' },
-      { kind: 'verify', title: 'fix 失败', status: 'error' },
+      { kind: 'verify', title: { copy: 'workflowCompleted', name: 'scan' }, status: 'ok' },
+      { kind: 'verify', title: { copy: 'workflowFailed', name: 'fix' }, status: 'error' },
     ])
   })
 
@@ -65,8 +65,8 @@ describe('non-tool cards', () => {
       tool(2, 'ask_user', {}),
     ])
     expect(result.cards.slice(0, 2)).toMatchObject([
-      { kind: 'interrupt', title: '请求人工确认，等待 4s', status: 'warning' },
-      { kind: 'interrupt', title: '请求人工确认，等待 0s' },
+      { kind: 'interrupt', title: { copy: 'interrupt', seconds: 4 }, status: 'warning' },
+      { kind: 'interrupt', title: { copy: 'interrupt', seconds: 0 } },
     ])
   })
 })
@@ -74,12 +74,16 @@ describe('non-tool cards', () => {
 describe('change cards', () => {
   it('treats a deletion as a change even when it runs through a shell tool', () => {
     const result = chainFromSpans([tool(1, 'bash', { op: 'delete', path: 'notes/old.md' })])
-    expect(result.cards[0]).toMatchObject({ kind: 'change', title: '删除 notes/old.md', status: 'error' })
+    expect(result.cards[0]).toMatchObject({
+      kind: 'change',
+      title: { copy: 'change', op: 'delete', path: 'notes/old.md' },
+      status: 'error',
+    })
   })
 
   it('recognises the delete tool name without an operation attribute', () => {
     const result = chainFromSpans([tool(1, 'delete', { path: 'notes/old.md' })])
-    expect(result.cards[0]).toMatchObject({ kind: 'change', title: '删除 notes/old.md' })
+    expect(result.cards[0]).toMatchObject({ kind: 'change', title: { copy: 'change', op: 'delete', path: 'notes/old.md' } })
   })
 
   it('renders created and updated files', () => {
@@ -88,8 +92,8 @@ describe('change cards', () => {
       tool(2, 'edit', { path: 'src/old.ts' }),
     ])
     expect(result.cards.slice(0, 2)).toMatchObject([
-      { kind: 'change', title: '新建 src/new.ts' },
-      { kind: 'change', title: '修改 src/old.ts' },
+      { kind: 'change', title: { copy: 'change', op: 'create', path: 'src/new.ts' } },
+      { kind: 'change', title: { copy: 'change', op: 'update', path: 'src/old.ts' } },
     ])
   })
 
@@ -99,8 +103,8 @@ describe('change cards', () => {
       tool(2, 'write', {}),
     ])
     expect(result.cards.slice(0, 2)).toMatchObject([
-      { kind: 'change', title: '修改 src/a.ts' },
-      { kind: 'change', title: '修改 write' },
+      { kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' } },
+      { kind: 'change', title: { copy: 'change', op: 'update', path: 'write' } },
     ])
   })
 })
@@ -114,10 +118,10 @@ describe('verification cards', () => {
       tool(4, 'run_code', {}, { status: 'running' }),
     ])
     expect(result.cards.slice(0, 4)).toMatchObject([
-      { kind: 'verify', title: 'pnpm test 失败：ASSERT', status: 'error' },
-      { kind: 'verify', title: 'pnpm lint 失败', status: 'error' },
-      { kind: 'verify', title: 'pnpm build 通过', status: 'ok' },
-      { kind: 'verify', title: 'run_code 通过', status: 'running' },
+      { kind: 'verify', title: { copy: 'verifyFailed', command: 'pnpm test', errorCode: 'ASSERT' }, status: 'error' },
+      { kind: 'verify', title: { copy: 'verifyFailed', command: 'pnpm lint' }, status: 'error' },
+      { kind: 'verify', title: { copy: 'verifyPassed', command: 'pnpm build' }, status: 'ok' },
+      { kind: 'verify', title: { copy: 'verifyPassed', command: 'run_code' }, status: 'running' },
     ])
   })
 })
@@ -130,15 +134,15 @@ describe('look-around cards', () => {
       tool(3, 'read', { path: 'src/b.ts' }),
       tool(4, 'list', {}),
     ])
-    expect(result.cards[0]).toMatchObject({ kind: 'recon', title: '查看了 2 个文件，检索 1 次' })
+    expect(result.cards[0]).toMatchObject({ kind: 'recon', title: { copy: 'recon', files: 2, searches: 1 } })
   })
 
   it('summarizes search-only and unknown tools', () => {
     const searches = chainFromSpans([tool(1, 'grep', { pattern: 'a' }), tool(2, 'glob', { pattern: '*.ts' })])
-    expect(searches.cards[0]?.title).toBe('检索 2 次')
+    expect(searches.cards[0]?.title).toEqual({ copy: 'recon', files: 0, searches: 2 })
 
     const unknown = chainFromSpans([tool(1, 'mystery_tool', {})])
-    expect(unknown.cards[0]).toMatchObject({ kind: 'recon', title: '查看' })
+    expect(unknown.cards[0]).toMatchObject({ kind: 'recon', title: { copy: 'recon', files: 0, searches: 0 } })
   })
 })
 
@@ -150,8 +154,8 @@ describe('merging rules', () => {
       tool(3, 'edit', { path: 'src/a.ts' }),
     ])
     expect(result.cards.slice(0, 2)).toMatchObject([
-      { kind: 'change', title: '修改 src/a.ts', repeat: 2, evidenceSeqs: [1, 3] },
-      { kind: 'change', title: '修改 src/b.ts' },
+      { kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, repeat: 2, evidenceSeqs: [1, 3] },
+      { kind: 'change', title: { copy: 'change', op: 'update', path: 'src/b.ts' } },
     ])
   })
 
@@ -161,7 +165,7 @@ describe('merging rules', () => {
       tool(2, 'bash', { command: 'b' }),
       tool(3, 'bash', { command: 'c' }),
     ])
-    expect(result.cards[0]).toMatchObject({ kind: 'verify', title: '验证 3 次，全部通过', evidenceSeqs: [1, 2, 3] })
+    expect(result.cards[0]).toMatchObject({ kind: 'verify', title: { copy: 'verifyRun', count: 3 }, evidenceSeqs: [1, 2, 3] })
   })
 
   it('keeps failed verifications standalone', () => {
@@ -242,7 +246,7 @@ describe('result card', () => {
     expect(result.cards).toEqual([{
       id: 'result:end',
       kind: 'result',
-      title: '本次改动 0 个文件，0 次验证',
+      title: { copy: 'result', files: 0, verifications: 0 },
       startedAt: 0,
       status: 'ok',
       evidenceSeqs: [],
@@ -254,7 +258,7 @@ describe('result card', () => {
       tool(1, 'edit', { path: 'src/a.ts' }),
       tool(2, 'bash', { command: 'test' }, { status: 'error' }),
     ])
-    expect(result.cards.at(-1)).toMatchObject({ title: '本次改动 1 个文件，1 次验证', status: 'error' })
+    expect(result.cards.at(-1)).toMatchObject({ title: { copy: 'result', files: 1, verifications: 1 }, status: 'error' })
   })
 
   it('uses the last settlement time when one exists', () => {

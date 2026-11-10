@@ -5,21 +5,39 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ActivitySpan, ChainCard, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
 import { AgentChainView, type AgentChainViewProps } from '../src/client/AgentChainView.tsx'
 import type { ChainSnapshot } from '../src/client/chain-view.ts'
 import { en, type AgentChainKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-/** Translate through the shipped English dictionary. */
-function t(key: AgentChainKey): string {
-  return en[key]
+/** Translate through the shipped English dictionary, interpolating its placeholders. */
+function t(key: AgentChainKey, params?: Record<string, unknown>): string {
+  return en[key].replace(/\{(\w+)\}/g, (_match, name: string) => {
+    const value = params?.[name]
+    return typeof value === 'string' || typeof value === 'number' ? String(value) : `{${name}}`
+  })
 }
 
 /** One card with the fields a test does not state defaulted to a quiet read. */
 function card(overrides: Partial<ChainCard> & Pick<ChainCard, 'kind' | 'title'>): ChainCard {
   return { id: `${overrides.kind}:1`, startedAt: 0, status: 'ok', evidenceSeqs: [], ...overrides }
+}
+
+/** One intent card, the only kind whose title is recorded text. */
+function intent(text: string): ChainCard {
+  return card({ kind: 'intent', title: { copy: 'intent', text } })
+}
+
+/** One change card; the title carries the operation and the target. */
+function change(path: string): ChainCard {
+  return card({ kind: 'change', title: { copy: 'change', op: 'update', path } })
+}
+
+/** One failing verification card. */
+function failedVerify(command: string): ChainCard {
+  return card({ kind: 'verify', title: { copy: 'verifyFailed', command }, status: 'error' })
 }
 
 /** One contributing span as the Definition publishes it. */
@@ -66,21 +84,23 @@ describe('waiting state', () => {
 })
 
 describe('card rows', () => {
-  it('renders one row per card with its kind, title, repeat, and status', () => {
+  it('renders one row per card with its localized title, repeat, and status', () => {
     renderView([
-      card({ kind: 'intent', title: 'inspect the catalog module' }),
-      card({ kind: 'change', title: 'modified a.ts', repeat: 3, status: 'warning' }),
+      intent('inspect the catalog module'),
+      card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' }, repeat: 3, status: 'warning' }),
     ])
     expect(screen.getByText('Intent')).toBeTruthy()
     expect(screen.getByText('inspect the catalog module')).toBeTruthy()
     expect(screen.getByText('Change')).toBeTruthy()
-    expect(screen.getByText('modified a.ts')).toBeTruthy()
+    expect(screen.getByText('a.ts modified')).toBeTruthy()
     expect(screen.getByText('×3')).toBeTruthy()
     expect(document.querySelector('[data-kind="change"]')?.getAttribute('data-status')).toBe('warning')
   })
 
   it('offers no disclosure for a card with nothing behind it', () => {
-    renderView([card({ kind: 'result', title: 'done' })])
+    const title: ChainTitle = { copy: 'result', files: 0, verifications: 0 }
+    renderView([card({ kind: 'result', title })])
+    expect(screen.getByText('0 files changed, 0 verifications')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show evidence' })).toBeNull()
   })
 })
@@ -88,21 +108,19 @@ describe('card rows', () => {
 describe('card disclosure', () => {
   const card_ = card({
     kind: 'change',
-    title: 'modified a.ts',
-    detail: 'renamed the index helper',
+    title: { copy: 'change', op: 'update', path: 'src/a.ts' },
     meta: { path: 'src/a.ts', op: 'create', files: 2 },
     evidenceSeqs: [12, 18],
   })
   const spans = [span(12, 'write'), span(18, 'bash', 'error')]
 
-  it('reveals facts, evidence, and detail text on demand', () => {
+  it('reveals the recorded facts and evidence on demand', () => {
     renderView([card_], [], { spans })
     const toggle = screen.getByRole('button', { name: 'Show evidence' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByText('src/a.ts')).toBeNull()
     fireEvent.click(toggle)
     expect(screen.getByRole('button', { name: 'Hide evidence' }).getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('renamed the index helper')).toBeTruthy()
     expect(screen.getByText('src/a.ts')).toBeTruthy()
     expect(screen.getByText('created')).toBeTruthy()
     expect(screen.getByText('Evidence')).toBeTruthy()
@@ -112,7 +130,7 @@ describe('card disclosure', () => {
     expect(screen.getByText('bash')).toBeTruthy()
   })
 
-  it('hides the detail again when toggled off', () => {
+  it('hides the facts again when toggled off', () => {
     renderView([card_], [], { spans })
     fireEvent.click(screen.getByRole('button', { name: 'Show evidence' }))
     fireEvent.click(screen.getByRole('button', { name: 'Hide evidence' }))
@@ -125,7 +143,7 @@ describe('review links', () => {
   it('opens the path a change card records', () => {
     const openFile = vi.fn()
     renderView(
-      [card({ kind: 'change', title: 'modified a.ts', meta: { path: 'src/a.ts' }, evidenceSeqs: [] })],
+      [card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, meta: { path: 'src/a.ts' } })],
       [],
       { openFile },
     )
@@ -136,8 +154,8 @@ describe('review links', () => {
 
   it('opens a file named by a risk flag', () => {
     const openFile = vi.fn()
-    renderView([card({ kind: 'change', title: 'modified a.ts' })], [
-      { code: 'tests-changed', severity: 'danger', reason: 'test files were modified', evidenceFiles: ['tests/a.spec.ts'] },
+    renderView([change('a.ts')], [
+      { code: 'touches-tests', severity: 'danger', reason: { copy: 'touchesTests' }, evidenceFiles: ['tests/a.spec.ts'] },
     ], { openFile })
     fireEvent.click(screen.getByRole('button', { name: 'Open in preview tests/a.spec.ts' }))
     expect(openFile).toHaveBeenCalledWith('tests/a.spec.ts')
@@ -146,7 +164,7 @@ describe('review links', () => {
   it('opens a cited tool call in the view that inspects calls', () => {
     const inspectCall = vi.fn()
     renderView(
-      [card({ kind: 'verify', title: 'go test passed', evidenceSeqs: [7] })],
+      [card({ kind: 'verify', title: { copy: 'verifyPassed', command: 'go test' }, evidenceSeqs: [7] })],
       [],
       { spans: [span(7, 'bash', 'ok', { callId: 'call-7' })], inspectCall },
     )
@@ -157,7 +175,7 @@ describe('review links', () => {
 
   it('leaves a cited span inert without a call identity or an inspector', () => {
     renderView(
-      [card({ kind: 'intent', title: 'inspect the catalog module', evidenceSeqs: [3, 4] })],
+      [card({ kind: 'intent', title: { copy: 'intent', text: 'inspect the catalog module' }, evidenceSeqs: [3, 4] })],
       [],
       {
         spans: [span(3, 'turn:1'), span(4, 'bash', 'ok', { callId: 'call-4' })],
@@ -172,11 +190,7 @@ describe('review links', () => {
 })
 
 describe('filters', () => {
-  const cards = [
-    card({ kind: 'intent', title: 'inspect the catalog module' }),
-    card({ kind: 'change', title: 'modified a.ts' }),
-    card({ kind: 'verify', title: 'go test failed', status: 'error' }),
-  ]
+  const cards = [intent('inspect the catalog module'), change('a.ts'), failedVerify('go test')]
 
   it('starts on the complete chain', () => {
     renderView(cards)
@@ -187,7 +201,7 @@ describe('filters', () => {
   it('keeps only changes', () => {
     renderView(cards)
     fireEvent.click(screen.getByRole('button', { name: 'Changes only' }))
-    expect(screen.getByText('modified a.ts')).toBeTruthy()
+    expect(screen.getByText('a.ts modified')).toBeTruthy()
     expect(screen.queryByText('go test failed')).toBeNull()
   })
 
@@ -199,7 +213,7 @@ describe('filters', () => {
   })
 
   it('explains an empty selection', () => {
-    renderView([card({ kind: 'intent', title: 'inspect the catalog module' })])
+    renderView([intent('inspect the catalog module')])
     fireEvent.click(screen.getByRole('button', { name: 'Risks only' }))
     expect(screen.getByText('Nothing matches this filter')).toBeTruthy()
   })
@@ -207,20 +221,20 @@ describe('filters', () => {
 
 describe('risk banner', () => {
   it('lists each risk with its severity, reason, and files', () => {
-    renderView([card({ kind: 'change', title: 'modified a.ts' })], [
-      { code: 'tests-changed', severity: 'danger', reason: 'test files were modified', evidenceFiles: ['tests/a.spec.ts'] },
-      { code: 'out-of-scope', severity: 'info', reason: 'touched an unrelated file', evidenceFiles: [] },
+    renderView([change('a.ts')], [
+      { code: 'touches-tests', severity: 'danger', reason: { copy: 'touchesTests' }, evidenceFiles: ['tests/a.spec.ts'] },
+      { code: 'out-of-scope', severity: 'info', reason: { copy: 'outOfScope' }, evidenceFiles: [] },
     ])
     expect(screen.getByLabelText('Review risks')).toBeTruthy()
     expect(screen.getByText('Blocker')).toBeTruthy()
-    expect(screen.getByText('test files were modified')).toBeTruthy()
+    expect(screen.getByText('Changed test files')).toBeTruthy()
     expect(screen.getByText('tests/a.spec.ts')).toBeTruthy()
     expect(screen.getByText('Note')).toBeTruthy()
-    expect(screen.getByText('touched an unrelated file')).toBeTruthy()
+    expect(screen.getByText('These files appear in no task description or exploration (inferred)')).toBeTruthy()
   })
 
   it('renders no banner without risks', () => {
-    renderView([card({ kind: 'change', title: 'modified a.ts' })])
+    renderView([change('a.ts')])
     expect(screen.queryByLabelText('Review risks')).toBeNull()
   })
 })

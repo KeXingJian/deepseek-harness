@@ -3,8 +3,11 @@
  * and palettes, status dots, and the expansion rows one card can offer.
  */
 
-import type { ActivitySpan, ChainCard, ChainKind, ChainStatus, RiskSeverity } from '@deepseek-ai/dsh-agent-activity'
+import type {
+  ActivitySpan, ChangeOp, ChainCard, ChainKind, ChainStatus, ChainTitle, RiskFlag, RiskReason, RiskSeverity,
+} from '@deepseek-ai/dsh-agent-activity'
 import type { StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { AgentChainKey } from './locales.ts'
 
 /** Which cards the reader asked to see. */
@@ -83,8 +86,105 @@ export interface ChainEvidenceSpan {
   readonly callId?: string | undefined
 }
 
-/** Translate one review-chain key. */
-export type ChainTranslate = (key: AgentChainKey) => string
+/** Translate one review-chain key, interpolating the placeholders the message declares. */
+export type ChainTranslate = (key: AgentChainKey, params?: Record<string, unknown>) => string
+
+/** Dictionary key naming one file operation's card title. */
+const CHANGE_TITLE_KEYS: Readonly<Record<ChangeOp, AgentChainKey>> = {
+  create: 'title.changeCreate',
+  update: 'title.changeUpdate',
+  delete: 'title.changeDelete',
+}
+
+/**
+ * Compose the counted title of one look-around card.
+ * @param files - files the merged card opened.
+ * @param searches - searches the merged card ran.
+ * @param t - review-chain translator.
+ * @returns the title naming whichever totals are positive.
+ */
+function reconText(files: number, searches: number, t: ChainTranslate): string {
+  if (files > 0 && searches > 0) return t('title.recon', { files, searches })
+  if (files > 0) return t('title.reconFiles', { files })
+  if (searches > 0) return t('title.reconSearches', { searches })
+  return t('title.reconNone')
+}
+
+/**
+ * Compose one card's title in the reader's language.
+ * @param card - the card to render.
+ * @param t - review-chain translator.
+ * @returns the title text; an intent card returns the model's own words verbatim.
+ */
+export function cardTitle(card: ChainCard, t: ChainTranslate): string {
+  return titleText(card.title, t)
+}
+
+/** Compose the title of one message descriptor. */
+function titleText(title: ChainTitle, t: ChainTranslate): string {
+  switch (title.copy) {
+    case 'intent':
+      return title.text
+    case 'recon':
+      return reconText(title.files, title.searches, t)
+    case 'reconCollapsed':
+      return t('title.reconCollapsed')
+    case 'subagent':
+      return t('title.subagent', { name: title.name })
+    case 'workflowCompleted':
+      return t('title.workflowCompleted', { name: title.name })
+    case 'workflowFailed':
+      return t('title.workflowFailed', { name: title.name })
+    case 'interrupt':
+      return t('title.interrupt', { seconds: title.seconds })
+    case 'change':
+      return t(CHANGE_TITLE_KEYS[title.op], { path: title.path })
+    case 'verifyPassed':
+      return t('title.verifyPassed', { command: title.command })
+    case 'verifyFailed':
+      return title.errorCode === undefined
+        ? t('title.verifyFailed', { command: title.command })
+        : t('title.verifyFailedCode', { command: title.command, code: title.errorCode })
+    case 'verifyRun':
+      return t('title.verifyRun', { count: title.count })
+    case 'result':
+      return t('title.result', { files: title.files, verifications: title.verifications })
+  }
+  /* v8 ignore next -- closed-union backstop; every title variant is handled above. */
+  return assertNever(title, 'chain title')
+}
+
+/**
+ * Compose one risk flag's reason in the reader's language.
+ * @param flag - the flag to render.
+ * @param t - review-chain translator.
+ * @returns the reason text.
+ */
+export function riskReason(flag: RiskFlag, t: ChainTranslate): string {
+  return reasonText(flag.reason, t)
+}
+
+/** Compose the reason of one rule finding. */
+function reasonText(reason: RiskReason, t: ChainTranslate): string {
+  switch (reason.copy) {
+    case 'touchesTests':
+      return t('risk.touchesTests')
+    case 'touchesCi':
+      return t('risk.touchesCi')
+    case 'deletes':
+      return t('risk.deletes', { count: reason.count })
+    case 'outOfScope':
+      return t('risk.outOfScope')
+    case 'unverified':
+      return t('risk.unverified')
+    case 'gaveUp':
+      return t('risk.gaveUp')
+    case 'planChurn':
+      return t('risk.planChurn', { count: reason.count })
+  }
+  /* v8 ignore next -- closed-union backstop; every rule finding is handled above. */
+  return assertNever(reason, 'risk reason')
+}
 
 /**
  * Map a card status onto the shared state dot.
@@ -215,8 +315,8 @@ export function evidenceSpans(card: ChainCard, spans: readonly ActivitySpan[]): 
  * Whether a card has anything to reveal.
  * @param card - the card in the list.
  * @param rows - its expansion facts.
- * @returns true when expansion would show text, facts, or evidence.
+ * @returns true when expansion would show facts or evidence.
  */
 export function isExpandable(card: ChainCard, rows: readonly ChainDetailRow[]): boolean {
-  return card.detail !== undefined || rows.length > 0 || card.evidenceSeqs.length > 0
+  return rows.length > 0 || card.evidenceSeqs.length > 0
 }

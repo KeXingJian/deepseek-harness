@@ -79,6 +79,7 @@ The summary lives in the fold state, not in a second projection: `openActivitySp
 ## Further Exploration
 
 - [`dsh-agent-activity`](../agent-activity/README.md) — the span fold and the execution chain this collection layer feeds.
+- [Review activity chain](../../../docs/subsystems/review-chain.md) — the summary and fold types this service persists and serves.
 - [Storage subsystem](../../../docs/subsystems/storage.md) — the schema-validated domain form, routing, and write durability this package relies on.
 - [Session query subsystem](../../../docs/subsystems/session-query.md) — the live-preferred complete-log read used for cold backfill.
 

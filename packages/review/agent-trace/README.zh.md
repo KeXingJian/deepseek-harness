@@ -79,6 +79,7 @@ const spans = await ctx.agentTrace.sessionTrace(sessionId)
 ## 延伸阅读
 
 - [`dsh-agent-activity`](../agent-activity/README.zh.md) —— 本采集层喂给执行链的 span 折叠与卡片投影。
+- [评审活动链](../../../docs/subsystems/review-chain.zh.md) —— 本服务持久化并提供读取的摘要与折叠类型。
 - [存储子系统](../../../docs/subsystems/storage.zh.md) —— 本包依赖的 schema 校验域、路由与写入持久性。
 - [会话查询子系统](../../../docs/subsystems/session-query.zh.md) —— 冷回填所用的“优先实时”的完整日志读取。
 

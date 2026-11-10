@@ -24,21 +24,21 @@
   ],
   "expected": {
     "cards": [
-      { "id": "intent:0", "kind": "intent", "title": "修复 CI 失败", "status": "ok", "evidenceSeqs": [0] },
-      { "id": "recon:2", "kind": "recon", "title": "查看了 3 个文件", "status": "ok", "evidenceSeqs": [2, 3, 4] },
-      { "id": "change:5", "kind": "change", "title": "修改 src/x.ts", "status": "ok", "evidenceSeqs": [5] },
-      { "id": "change:6", "kind": "change", "title": "修改 tests/x.test.ts", "status": "warning", "evidenceSeqs": [6] },
-      { "id": "change:8", "kind": "change", "title": "修改 .github/workflows/ci.yml", "status": "warning", "evidenceSeqs": [8] },
-      { "id": "change:10", "kind": "change", "title": "修改 src/unrelated.ts", "status": "warning", "evidenceSeqs": [10] },
-      { "id": "change:12", "kind": "change", "title": "删除 docs/legacy.md", "status": "error", "evidenceSeqs": [12] },
-      { "id": "result:end", "kind": "result", "title": "本次改动 5 个文件，0 次验证", "status": "error", "evidenceSeqs": [] }
+      { "id": "intent:0", "kind": "intent", "title": { "copy": "intent", "text": "修复 CI 失败" }, "status": "ok", "evidenceSeqs": [0] },
+      { "id": "recon:2", "kind": "recon", "title": { "copy": "recon", "files": 3, "searches": 0 }, "status": "ok", "evidenceSeqs": [2, 3, 4] },
+      { "id": "change:5", "kind": "change", "title": { "copy": "change", "op": "update", "path": "src/x.ts" }, "status": "ok", "evidenceSeqs": [5] },
+      { "id": "change:6", "kind": "change", "title": { "copy": "change", "op": "update", "path": "tests/x.test.ts" }, "status": "warning", "evidenceSeqs": [6] },
+      { "id": "change:8", "kind": "change", "title": { "copy": "change", "op": "update", "path": ".github/workflows/ci.yml" }, "status": "warning", "evidenceSeqs": [8] },
+      { "id": "change:10", "kind": "change", "title": { "copy": "change", "op": "update", "path": "src/unrelated.ts" }, "status": "warning", "evidenceSeqs": [10] },
+      { "id": "change:12", "kind": "change", "title": { "copy": "change", "op": "delete", "path": "docs/legacy.md" }, "status": "error", "evidenceSeqs": [12] },
+      { "id": "result:end", "kind": "result", "title": { "copy": "result", "files": 5, "verifications": 0 }, "status": "error", "evidenceSeqs": [] }
     ],
     "flags": [
-      { "code": "deletes", "severity": "danger", "reason": "删除了 1 个文件", "evidenceFiles": ["docs/legacy.md"] },
-      { "code": "unverified", "severity": "danger", "reason": "存在改动，但没有任何通过的验证", "evidenceFiles": ["src/x.ts", "tests/x.test.ts", ".github/workflows/ci.yml", "src/unrelated.ts", "docs/legacy.md"] },
-      { "code": "touches-tests", "severity": "warn", "reason": "改动了测试文件", "evidenceFiles": ["tests/x.test.ts"] },
-      { "code": "touches-ci", "severity": "warn", "reason": "改动了 CI 或构建配置", "evidenceFiles": [".github/workflows/ci.yml"] },
-      { "code": "out-of-scope", "severity": "info", "reason": "以下文件未在任务描述或勘察中出现（推断）", "evidenceFiles": ["src/unrelated.ts"] }
+      { "code": "deletes", "severity": "danger", "reason": { "copy": "deletes", "count": 1 }, "evidenceFiles": ["docs/legacy.md"] },
+      { "code": "unverified", "severity": "danger", "reason": { "copy": "unverified" }, "evidenceFiles": ["src/x.ts", "tests/x.test.ts", ".github/workflows/ci.yml", "src/unrelated.ts", "docs/legacy.md"] },
+      { "code": "touches-tests", "severity": "warn", "reason": { "copy": "touchesTests" }, "evidenceFiles": ["tests/x.test.ts"] },
+      { "code": "touches-ci", "severity": "warn", "reason": { "copy": "touchesCi" }, "evidenceFiles": [".github/workflows/ci.yml"] },
+      { "code": "out-of-scope", "severity": "info", "reason": { "copy": "outOfScope" }, "evidenceFiles": ["src/unrelated.ts"] }
     ]
   }
 }

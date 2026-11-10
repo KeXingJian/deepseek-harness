@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-agent-activity
  */
 
-import type { ActivitySpan, ChainCard, ChainResult } from './types.ts'
+import type { ActivitySpan, ChainCard, ChainResult, ChainTitle } from './types.ts'
 import { reviewFlags } from './risk.ts'
 
 /** Tools whose calls only look around. */
@@ -38,10 +38,10 @@ function metaCount(card: ChainCard, key: 'files' | 'searches'): number {
   return typeof value === 'number' ? value : 0
 }
 
-/** Target path of one change card; change cards are always built with one. */
-/* v8 ignore next 2 -- change cards are built with a path, so the title fallback is unreachable. */
+/** Target path of one change card, which always carries the change title. */
 function metaPath(card: ChainCard): string {
-  return String(card.meta?.path ?? card.title)
+  /* v8 ignore next -- every card reaching this helper was built as a change card. */
+  return card.title.copy === 'change' ? card.title.path : ''
 }
 
 /** Whole seconds a span lasted, or 0 while it runs. */
@@ -80,17 +80,14 @@ function changePath(span: ActivitySpan): string {
   return attrString(span, 'path') ?? attrString(span, 'file') ?? span.name
 }
 
-/** Compose the summary title of a look-around card. */
-function reconTitle(files: number, searches: number): string {
-  if (files > 0 && searches > 0) return `查看了 ${files} 个文件，检索 ${searches} 次`
-  if (files > 0) return `查看了 ${files} 个文件`
-  if (searches > 0) return `检索 ${searches} 次`
-  return '查看'
+/** Summary title of a look-around card covering the given totals. */
+function reconTitle(files: number, searches: number): ChainTitle {
+  return { copy: 'recon', files, searches }
 }
 
 /** Whether a card came from a read or search tool rather than a subagent hand-off. */
 function isToolRecon(card: ChainCard): boolean {
-  return card.kind === 'recon' && typeof card.meta?.tool === 'string' && card.meta.tool !== 'subagent'
+  return card.title.copy === 'recon'
 }
 
 /** Build the card one span contributes, or null when the span only supports a parent card. */
@@ -101,7 +98,7 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     return {
       id: `intent:${span.seq}`,
       kind: 'intent',
-      title: intent.trim().slice(0, 60),
+      title: { copy: 'intent', text: intent.trim().slice(0, 60) },
       startedAt: span.startTime,
       status: 'ok',
       evidenceSeqs: [span.seq],
@@ -112,7 +109,7 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     return {
       id: `recon:${span.seq}`,
       kind: 'recon',
-      title: `交给子代理：${span.name}`,
+      title: { copy: 'subagent', name: span.name },
       startedAt: span.startTime,
       status: span.status === 'error' ? 'error' : 'ok',
       evidenceSeqs: [span.seq],
@@ -124,7 +121,9 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     return {
       id: `verify:${span.seq}`,
       kind: 'verify',
-      title: `${span.name} ${span.status === 'error' ? '失败' : '完成'}`,
+      title: span.status === 'error'
+        ? { copy: 'workflowFailed', name: span.name }
+        : { copy: 'workflowCompleted', name: span.name },
       startedAt: span.startTime,
       status: span.status === 'error' ? 'error' : 'ok',
       evidenceSeqs: [span.seq],
@@ -137,7 +136,7 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     return {
       id: `interrupt:${span.seq}`,
       kind: 'interrupt',
-      title: `请求人工确认，等待 ${seconds(span)}s`,
+      title: { copy: 'interrupt', seconds: seconds(span) },
       startedAt: span.startTime,
       status: 'warning',
       evidenceSeqs: [span.seq],
@@ -151,7 +150,7 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     return {
       id: `change:${span.seq}`,
       kind: 'change',
-      title: `删除 ${path}`,
+      title: { copy: 'change', op: 'delete', path },
       startedAt: span.startTime,
       status: 'error',
       evidenceSeqs: [span.seq],
@@ -167,8 +166,8 @@ function baseCard(span: ActivitySpan): ChainCard | null {
       id: `verify:${span.seq}`,
       kind: 'verify',
       title: failed
-        ? `${command} 失败${errorCode === undefined ? '' : `：${errorCode}`}`
-        : `${command} 通过`,
+        ? { copy: 'verifyFailed', command, ...errorCode === undefined ? {} : { errorCode } }
+        : { copy: 'verifyPassed', command },
       startedAt: span.startTime,
       status: failed ? 'error' : span.status === 'running' ? 'running' : 'ok',
       evidenceSeqs: [span.seq],
@@ -182,7 +181,7 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     return {
       id: `change:${span.seq}`,
       kind: 'change',
-      title: `${created ? '新建' : '修改'} ${path}`,
+      title: { copy: 'change', op: created ? 'create' : 'update', path },
       startedAt: span.startTime,
       status: 'ok',
       evidenceSeqs: [span.seq],
@@ -191,15 +190,18 @@ function baseCard(span: ActivitySpan): ChainCard | null {
   }
 
   const tool = span.name
-  const readsFile = READ_TOOLS.has(tool) && attrString(span, 'path') !== undefined
+  // A search tool counts as a search even when it opens a file; one card's
+  // totals must not depend on whether it later merges with its neighbour.
+  const files = SEARCH_TOOLS.has(tool) ? 0 : READ_TOOLS.has(tool) && attrString(span, 'path') !== undefined ? 1 : 0
+  const searches = SEARCH_TOOLS.has(tool) ? 1 : 0
   return {
     id: `recon:${span.seq}`,
     kind: 'recon',
-    title: tool,
+    title: reconTitle(files, searches),
     startedAt: span.startTime,
     status: 'ok',
     evidenceSeqs: [span.seq],
-    meta: { tool, files: readsFile ? 1 : 0, searches: SEARCH_TOOLS.has(tool) ? 1 : 0 },
+    meta: { tool, files, searches },
   }
 }
 
@@ -207,26 +209,19 @@ function baseCard(span: ActivitySpan): ChainCard | null {
 function mergeRecon(cards: readonly ChainCard[]): ChainCard[] {
   const out: ChainCard[] = []
   for (const card of cards) {
-    if (!isToolRecon(card)) {
+    const previous = out.at(-1)
+    if (!isToolRecon(card) || previous === undefined || !isToolRecon(previous)) {
       out.push(card)
       continue
     }
-    const tool = String(card.meta?.tool)
-    const files = SEARCH_TOOLS.has(tool) ? 0 : metaCount(card, 'files')
-    const searches = SEARCH_TOOLS.has(tool) ? 1 : 0
-    const previous = out.at(-1)
-    if (previous !== undefined && isToolRecon(previous)) {
-      const totalFiles = metaCount(previous, 'files') + files
-      const totalSearches = metaCount(previous, 'searches') + searches
-      out[out.length - 1] = {
-        ...previous,
-        title: reconTitle(totalFiles, totalSearches),
-        evidenceSeqs: [...previous.evidenceSeqs, ...card.evidenceSeqs],
-        meta: { ...previous.meta, files: totalFiles, searches: totalSearches },
-      }
-      continue
+    const files = metaCount(previous, 'files') + metaCount(card, 'files')
+    const searches = metaCount(previous, 'searches') + metaCount(card, 'searches')
+    out[out.length - 1] = {
+      ...previous,
+      title: reconTitle(files, searches),
+      evidenceSeqs: [...previous.evidenceSeqs, ...card.evidenceSeqs],
+      meta: { ...previous.meta, files, searches },
     }
-    out.push({ ...card, title: reconTitle(files, searches), meta: { ...card.meta, files, searches } })
   }
   return out
 }
@@ -270,7 +265,7 @@ function foldVerifies(cards: readonly ChainCard[]): ChainCard[] {
     } else {
       out.push({
         ...first,
-        title: `验证 ${run.length} 次，全部通过`,
+        title: { copy: 'verifyRun', count: run.length },
         evidenceSeqs: run.flatMap(card => card.evidenceSeqs),
       })
     }
@@ -288,6 +283,12 @@ function foldVerifies(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
+/** Text an intent card shows verbatim. */
+function intentText(card: ChainCard): string {
+  /* v8 ignore next -- dedupeIntents compares intent cards only, so the recorded-text arm always applies. */
+  return card.title.copy === 'intent' ? card.title.text : ''
+}
+
 /** Drop near-duplicate intents unless a failure or interruption forces a new one. */
 function dedupeIntents(cards: readonly ChainCard[]): ChainCard[] {
   const out: ChainCard[] = []
@@ -299,7 +300,7 @@ function dedupeIntents(cards: readonly ChainCard[]): ChainCard[] {
     const previous = [...out].reverse().find(entry => entry.kind === 'intent')
     const last = out.at(-1)
     const forced = last?.kind === 'interrupt' || (last?.kind === 'verify' && last.status === 'error')
-    if (previous !== undefined && !forced && similarity(previous.title, card.title) >= 0.8) {
+    if (previous !== undefined && !forced && similarity(intentText(previous), intentText(card)) >= 0.8) {
       const index = out.lastIndexOf(previous)
       out[index] = { ...previous, evidenceSeqs: [...previous.evidenceSeqs, ...card.evidenceSeqs] }
       continue
@@ -322,7 +323,7 @@ function capCards(cards: readonly ChainCard[]): ChainCard[] {
     if (first !== undefined && second !== undefined) {
       out[first.index] = {
         ...first.card,
-        title: '查看与检索',
+        title: { copy: 'reconCollapsed' },
         evidenceSeqs: [...first.card.evidenceSeqs, ...second.card.evidenceSeqs],
       }
       out.splice(second.index, 1)
@@ -346,7 +347,7 @@ function resultCard(spans: readonly ActivitySpan[], cards: readonly ChainCard[])
   return {
     id: 'result:end',
     kind: 'result',
-    title: `本次改动 ${files.size} 个文件，${verifications} 次验证`,
+    title: { copy: 'result', files: files.size, verifications },
     startedAt: last?.endTime ?? last?.startTime ?? 0,
     status: files.size > 0 && !verified ? 'error' : 'ok',
     evidenceSeqs: [],
