@@ -1,6 +1,6 @@
 /**
- * Presentation vocabulary for the review chain: filter selection, kind labels
- * and palettes, status dots, and the expansion rows one card can offer.
+ * 评审链的展示词汇：筛选选择、类型标签与配色、状态圆点，以及单张卡片
+ * 可提供的展开行。
  */
 
 import type {
@@ -10,20 +10,20 @@ import type { StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitiv
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { AgentChainKey } from './locales.ts'
 
-/** Which cards the reader asked to see. */
+/** 读者要求查看哪些卡片。 */
 export type ChainFilter = 'all' | 'changes' | 'risks'
 
-/** Filter buttons in display order. */
+/** 按展示顺序排列的筛选按钮。 */
 export const CHAIN_FILTERS: readonly ChainFilter[] = ['all', 'changes', 'risks']
 
-/** Dictionary key naming one filter. */
+/** 命名一个筛选器的词典键。 */
 export const FILTER_KEYS: Readonly<Record<ChainFilter, AgentChainKey>> = {
   all: 'filter.all',
   changes: 'filter.changes',
   risks: 'filter.risks',
 }
 
-/** Dictionary key naming one card kind. */
+/** 命名一种卡片类型的词典键。 */
 export const KIND_KEYS: Readonly<Record<ChainKind, AgentChainKey>> = {
   intent: 'kind.intent',
   recon: 'kind.recon',
@@ -33,7 +33,7 @@ export const KIND_KEYS: Readonly<Record<ChainKind, AgentChainKey>> = {
   result: 'kind.result',
 }
 
-/** Tag palette of one card kind; failures and warnings stay on the status dot. */
+/** 一种卡片类型的标签配色；失败和警告仍由状态圆点表示。 */
 export const KIND_TONES: Readonly<Record<ChainKind, TagTone>> = {
   intent: 'info',
   recon: 'quiet',
@@ -43,53 +43,53 @@ export const KIND_TONES: Readonly<Record<ChainKind, TagTone>> = {
   result: 'outline',
 }
 
-/** Tag palette of one risk severity. */
+/** 一种风险严重程度的标签配色。 */
 export const SEVERITY_TONES: Readonly<Record<RiskSeverity, TagTone>> = {
   danger: 'danger',
   warn: 'warning',
   info: 'info',
 }
 
-/** Dictionary key naming one risk severity. */
+/** 命名一种风险严重程度的词典键。 */
 export const SEVERITY_KEYS: Readonly<Record<RiskSeverity, AgentChainKey>> = {
   danger: 'severity.danger',
   warn: 'severity.warn',
   info: 'severity.info',
 }
 
-/** Dictionary key naming one change operation the projection records. */
+/** 命名投影记录的一种变更操作的词典键。 */
 const OP_KEYS: Readonly<Record<string, AgentChainKey>> = {
   create: 'op.create',
   update: 'op.update',
   delete: 'op.delete',
 }
 
-/** One labeled fact shown when a card is expanded. */
+/** 卡片展开时显示的一条带标签的事实。 */
 export interface ChainDetailRow {
-  /** Localized field name. */
+  /** 本地化的字段名。 */
   readonly label: string
-  /** Field value as recorded; never translated. */
+  /** 记录时的字段值；从不翻译。 */
   readonly value: string
-  /** Workspace path the value names, when the file preview can open it. */
+  /** 该值所指的工作区路径，仅当文件预览能打开它时存在。 */
   readonly file?: string | undefined
 }
 
-/** One contributing span shown under an expanded card. */
+/** 展开卡片下方显示的一个贡献 span。 */
 export interface ChainEvidenceSpan {
-  /** Session-log position a reader cross-checks in the transcript. */
+  /** 读者可在转录中核对的 Session 日志位置。 */
   readonly seq: number
-  /** Raw span name, never translated. */
+  /** 原始 span 名称，从不翻译。 */
   readonly name: string
-  /** Dot state for the span's settlement. */
+  /** span 结算结果对应的圆点状态。 */
   readonly dot: StateDotState
-  /** Tool-call identity when this span is a call; absent for turn and step spans. */
+  /** 当该 span 是一次调用时，为工具调用的标识；turn 和 step 类型的 span 没有该字段。 */
   readonly callId?: string | undefined
 }
 
-/** Translate one review-chain key, interpolating the placeholders the message declares. */
+/** 翻译一个评审链键，并插值消息中声明的占位符。 */
 export type ChainTranslate = (key: AgentChainKey, params?: Record<string, unknown>) => string
 
-/** Dictionary key naming one file operation's card title. */
+/** 命名一种文件操作卡片标题的词典键。 */
 const CHANGE_TITLE_KEYS: Readonly<Record<ChangeOp, AgentChainKey>> = {
   create: 'title.changeCreate',
   update: 'title.changeUpdate',
@@ -97,11 +97,11 @@ const CHANGE_TITLE_KEYS: Readonly<Record<ChangeOp, AgentChainKey>> = {
 }
 
 /**
- * Compose the counted title of one look-around card.
- * @param files - files the merged card opened.
- * @param searches - searches the merged card ran.
- * @param t - review-chain translator.
- * @returns the title naming whichever totals are positive.
+ * 组合一张勘察卡片的计数标题。
+ * @param files - 合并后的卡片打开的文件数。
+ * @param searches - 合并后的卡片执行的检索数。
+ * @param t - 评审链翻译器。
+ * @returns 由取值为正的那些总数构成的标题。
  */
 function reconText(files: number, searches: number, t: ChainTranslate): string {
   if (files > 0 && searches > 0) return t('title.recon', { files, searches })
@@ -111,16 +111,16 @@ function reconText(files: number, searches: number, t: ChainTranslate): string {
 }
 
 /**
- * Compose one card's title in the reader's language.
- * @param card - the card to render.
- * @param t - review-chain translator.
- * @returns the title text; an intent card returns the model's own words verbatim.
+ * 用读者的语言组合单张卡片的标题。
+ * @param card - 要渲染的卡片。
+ * @param t - 评审链翻译器。
+ * @returns 标题文本；intent 卡片会原样返回模型自己的措辞。
  */
 export function cardTitle(card: ChainCard, t: ChainTranslate): string {
   return titleText(card.title, t)
 }
 
-/** Compose the title of one message descriptor. */
+/** 组合一条消息描述符的标题。 */
 function titleText(title: ChainTitle, t: ChainTranslate): string {
   switch (title.copy) {
     case 'intent':
@@ -150,21 +150,21 @@ function titleText(title: ChainTitle, t: ChainTranslate): string {
     case 'result':
       return t('title.result', { files: title.files, verifications: title.verifications })
   }
-  /* v8 ignore next -- closed-union backstop; every title variant is handled above. */
+  /* v8 ignore next -- 封闭联合的兜底分支；上面已处理所有标题变体。 */
   return assertNever(title, 'chain title')
 }
 
 /**
- * Compose one risk flag's reason in the reader's language.
- * @param flag - the flag to render.
- * @param t - review-chain translator.
- * @returns the reason text.
+ * 用读者的语言组合一个风险标记的原因。
+ * @param flag - 要渲染的标记。
+ * @param t - 评审链翻译器。
+ * @returns 原因文本。
  */
 export function riskReason(flag: RiskFlag, t: ChainTranslate): string {
   return reasonText(flag.reason, t)
 }
 
-/** Compose the reason of one rule finding. */
+/** 组合一条规则发现的原因。 */
 function reasonText(reason: RiskReason, t: ChainTranslate): string {
   switch (reason.copy) {
     case 'touchesTests':
@@ -182,14 +182,14 @@ function reasonText(reason: RiskReason, t: ChainTranslate): string {
     case 'planChurn':
       return t('risk.planChurn', { count: reason.count })
   }
-  /* v8 ignore next -- closed-union backstop; every rule finding is handled above. */
+  /* v8 ignore next -- 封闭联合的兜底分支；上面已处理所有规则发现。 */
   return assertNever(reason, 'risk reason')
 }
 
 /**
- * Map a card status onto the shared state dot.
- * @param status - card status from the projection.
- * @returns dot state; `ok` reads as done and `running` as an ongoing loader.
+ * 把卡片状态映射到共享的状态圆点。
+ * @param status - 投影得到的卡片状态。
+ * @returns 圆点状态；`ok` 显示为完成，`running` 显示为进行中的加载指示。
  */
 export function statusDot(state: ChainStatus | undefined): StateDotState {
   switch (state) {
@@ -205,10 +205,10 @@ export function statusDot(state: ChainStatus | undefined): StateDotState {
 }
 
 /**
- * Keep the cards one filter admits.
- * @param cards - chain cards in display order.
- * @param filter - selected filter.
- * @returns matching cards; `all` keeps the input array.
+ * 保留某个筛选器允许的卡片。
+ * @param cards - 按展示顺序排列的链卡片。
+ * @param filter - 选中的筛选器。
+ * @returns 匹配的卡片；`all` 会保持输入数组不变。
  */
 export function filterCards(cards: readonly ChainCard[], filter: ChainFilter): readonly ChainCard[] {
   switch (filter) {
@@ -222,9 +222,9 @@ export function filterCards(cards: readonly ChainCard[], filter: ChainFilter): r
 }
 
 /**
- * Map a span settlement onto the shared state dot.
- * @param status - settlement recorded on the span.
- * @returns dot state; a span stopped before it settled reads as a warning.
+ * 把 span 的结算结果映射到共享的状态圆点。
+ * @param status - span 上记录的结算结果。
+ * @returns 圆点状态；在结算前就停止的 span 显示为警告。
  */
 export function spanDot(status: ActivitySpan['status']): StateDotState {
   switch (status) {
@@ -240,10 +240,10 @@ export function spanDot(status: ActivitySpan['status']): StateDotState {
 }
 
 /**
- * Read one recorded fact as a string.
- * @param meta - card facts.
- * @param key - fact name.
- * @returns the value, or undefined when absent or not a string.
+ * 把一条记录的事实按字符串读取。
+ * @param meta - 卡片事实。
+ * @param key - 事实名称。
+ * @returns 该值；缺失或不是字符串时为 undefined。
  */
 function metaString(meta: ChainCard['meta'], key: string): string | undefined {
   const value = meta?.[key]
@@ -251,10 +251,10 @@ function metaString(meta: ChainCard['meta'], key: string): string | undefined {
 }
 
 /**
- * Read one recorded fact as a positive count.
- * @param meta - card facts.
- * @param key - fact name.
- * @returns the count as text, or undefined when absent, not a number, or not positive.
+ * 把一条记录的事实按正数计数读取。
+ * @param meta - 卡片事实。
+ * @param key - 事实名称。
+ * @returns 计数的文本形式；缺失、不是数字或不为正数时为 undefined。
  */
 function metaCount(meta: ChainCard['meta'], key: string): string | undefined {
   const value = meta?.[key]
@@ -262,13 +262,13 @@ function metaCount(meta: ChainCard['meta'], key: string): string | undefined {
 }
 
 /**
- * Build the labeled facts one expanded card shows.
+ * 构建一张展开的卡片所显示的带标签事实。
  *
- * `path`, `command`, and `tool` repeat what the title already states for some
- * kinds, but a reader expanding a card is checking the record, not skimming it.
- * @param card - the card being expanded.
- * @param t - review-chain translator.
- * @returns rows in a stable field order; empty when the card records nothing.
+ * `path`、`command` 和 `tool` 对某些类型来说重复了标题中已有的内容，但读者展开
+ * 卡片是在核对记录，而不是快速浏览。
+ * @param card - 正在展开的卡片。
+ * @param t - 评审链翻译器。
+ * @returns 按固定字段顺序排列的行；卡片没有记录任何内容时为空。
  */
 export function detailRows(card: ChainCard, t: ChainTranslate): readonly ChainDetailRow[] {
   const rows: ChainDetailRow[] = []
@@ -291,10 +291,10 @@ export function detailRows(card: ChainCard, t: ChainTranslate): readonly ChainDe
 }
 
 /**
- * Read the spans one card cites, in the order its evidence lists them.
- * @param card - the expanded card.
- * @param spans - every span the chain snapshot published.
- * @returns one row per cited sequence the snapshot still holds.
+ * 按卡片依据列出的顺序读取它引用的 span。
+ * @param card - 展开的卡片。
+ * @param spans - 链快照发布的所有 span。
+ * @returns 快照仍持有的每个被引用序号对应一行。
  */
 export function evidenceSpans(card: ChainCard, spans: readonly ActivitySpan[]): readonly ChainEvidenceSpan[] {
   const bySeq = new Map(spans.map(span => [span.seq, span]))
@@ -312,10 +312,10 @@ export function evidenceSpans(card: ChainCard, spans: readonly ActivitySpan[]): 
 }
 
 /**
- * Whether a card has anything to reveal.
- * @param card - the card in the list.
- * @param rows - its expansion facts.
- * @returns true when expansion would show facts or evidence.
+ * 判断卡片是否有可展示的内容。
+ * @param card - 列表中的卡片。
+ * @param rows - 它的展开事实。
+ * @returns 展开后会显示事实或依据时为 true。
  */
 export function isExpandable(card: ChainCard, rows: readonly ChainDetailRow[]): boolean {
   return rows.length > 0 || card.evidenceSeqs.length > 0

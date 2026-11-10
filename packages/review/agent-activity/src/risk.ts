@@ -1,15 +1,15 @@
 /**
- * Review risk rules over a projected chain.
+ * 针对已投影链路的评审风险规则。
  *
  * @module @deepseek-ai/dsh-agent-activity
  */
 
 import type { ActivitySpan, ChainCard, RiskFlag } from './types.ts'
 
-/** Tools whose calls only look around. */
+/** 其调用仅做探查的工具。 */
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'list', 'lsp', 'fs_search', 'web_search', 'web_fetch'])
 
-/** Tools that execute a command. */
+/** 会执行命令的工具。 */
 const EXEC_TOOLS = new Set(['bash', 'exec', 'test', 'build', 'lint', 'run_code'])
 
 const TEST_PATH = /(^|\/)(tests?|__tests__|spec)\/|\.(test|spec)\.[cm]?[jt]sx?$/
@@ -17,28 +17,28 @@ const CI_PATH = /^\.github\/|(^|\/)(ci|\.ci)\/|(^|\/)(tsconfig|\.eslintrc|eslint
 
 const SEVERITY_ORDER = { danger: 0, warn: 1, info: 2 } as const
 
-/** Read one attribute as a string, or undefined. */
+/** 将一个属性读作字符串；不存在时返回 undefined。 */
 function attrString(span: ActivitySpan, key: string): string | undefined {
   const value = span.attributes?.[key]
   return typeof value === 'string' ? value : undefined
 }
 
-/** Command text of one execution span. */
+/** 单次执行跨度的命令文本。 */
 function verifyCommand(span: ActivitySpan): string {
   return attrString(span, 'command') ?? span.name
 }
 
-/** File path a span changed. */
+/** 该跨度变更的文件路径。 */
 function changePath(span: ActivitySpan): string {
   return attrString(span, 'path') ?? attrString(span, 'file') ?? span.name
 }
 
-/** Whether one span records a deletion. */
+/** 该跨度是否记录了一次删除。 */
 function isDeletion(span: ActivitySpan): boolean {
   return attrString(span, 'op') === 'delete' || span.name === 'delete'
 }
 
-/** Compare a changed path with paths the session already saw, including directory reads. */
+/** 将变更路径与会话此前已见过的路径（含目录读取）进行比较。 */
 function sawEarlier(paths: readonly string[], path: string): boolean {
   return paths.some(known => known === path
     || known.endsWith(`/${path}`)
@@ -47,11 +47,11 @@ function sawEarlier(paths: readonly string[], path: string): boolean {
 }
 
 /**
- * Compute review risk flags over a chain.
- * @param spans - the spans the chain was projected from.
- * @param cards - the projected cards, including the result card.
- * @param userText - the user's task text, used only by the out-of-scope heuristic.
- * @returns flags ordered by severity.
+ * 在一条链路上计算评审风险标记。
+ * @param spans - 链路投影所依据的跨度。
+ * @param cards - 投影出的卡片，包含结果卡片。
+ * @param userText - 用户的任务文本，仅用于范围外启发式判断。
+ * @returns 按严重程度排序的标记。
  */
 export function reviewFlags(
   spans: readonly ActivitySpan[],

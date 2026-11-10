@@ -1,7 +1,6 @@
 /**
- * Review chain view: the risk banner, the three card filters, and the
- * readable card list a reviewer scans without opening the transcript.
- * Expansion reveals the files and raw spans a card was folded from.
+ * 评审链视图：风险横幅、三个卡片筛选器，以及评审者无需打开转录即可浏览的
+ * 可读卡片列表。展开后会显示折叠出该卡片的文件和原始 span。
  */
 
 import { Fragment, useState } from 'react'
@@ -15,19 +14,19 @@ import {
 } from './chain-copy.ts'
 import css from './AgentChainView.module.css'
 
-/** Props bound by the conversation view slot. */
+/** 由会话视图 slot 绑定的 props。 */
 export interface AgentChainViewProps {
-  /** Latest chain snapshot for the Session on screen. */
+  /** 屏幕上 Session 的最新链快照。 */
   readonly useChain: <S>(selector: (snapshot: ChainSnapshot) => S) => S
-  /** Translate one review-chain key. */
+  /** 翻译一个评审链键。 */
   readonly t: ChainTranslate
-  /** Open one workspace file in the Sidebar preview. */
+  /** 在 Sidebar 预览中打开一个工作区文件。 */
   readonly openFile: (path: string) => void
-  /** Open a tool call in the View that claims call focus; absent when none does. */
+  /** 在认领该调用焦点的 View 中打开工具调用；没有认领者时为空。 */
   readonly inspectCall: ((callId: string) => void) | undefined
 }
 
-/** One file name that opens its content beside the conversation. */
+/** 一个文件名，点击后可在会话旁打开其内容。 */
 function FileButton({ path, openFile, t }: {
   path: string
   openFile: AgentChainViewProps['openFile']
@@ -45,7 +44,7 @@ function FileButton({ path, openFile, t }: {
   )
 }
 
-/** One contributing span; a tool call keeps its sequence while it runs. */
+/** 一个贡献 span；工具调用在运行期间保持其序号。 */
 function EvidenceRow({ span, inspectCall, t }: {
   span: ChainEvidenceSpan
   inspectCall: AgentChainViewProps['inspectCall']
@@ -77,7 +76,7 @@ function EvidenceRow({ span, inspectCall, t }: {
   )
 }
 
-/** One card row with its own disclosure state. */
+/** 一行卡片，拥有自己的展开状态。 */
 function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }: {
   card: ChainCard
   spans: ChainSnapshot['spans']
@@ -89,7 +88,7 @@ function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }:
 }) {
   const rows = detailRows(card, t)
   const expandable = isExpandable(card, rows)
-  // Collapsed cards stay cheap: the span lookup runs only for a revealed card.
+  // 折叠的卡片保持低开销：只有展开的卡片才会执行 span 查找。
   const evidence = open ? evidenceSpans(card, spans) : []
   return (
     <li className={css.card} data-kind={card.kind} data-status={card.status}>
@@ -143,9 +142,9 @@ function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }:
 }
 
 /**
- * Render the review execution chain.
- * @param props - bound snapshot hook, translator, file opener, and call inspector.
- * @returns the chain view, filters, and risk banner, or the empty-state line.
+ * 渲染评审执行链。
+ * @param props - 绑定的快照 hook、翻译器、文件打开器和调用查看器。
+ * @returns 链视图、筛选器和风险横幅，或空状态提示。
  */
 export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChainViewProps) {
   const chain = useChain(snapshot => snapshot)

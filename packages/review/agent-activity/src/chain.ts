@@ -1,5 +1,5 @@
 /**
- * Projection from folded activity spans to the review-oriented execution chain.
+ * 从折叠后的活动跨度到面向评审的执行链的投影。
  *
  * @module @deepseek-ai/dsh-agent-activity
  */
@@ -7,49 +7,49 @@
 import type { ActivitySpan, ChainCard, ChainResult, ChainTitle } from './types.ts'
 import { reviewFlags } from './risk.ts'
 
-/** Tools whose calls only look around. */
+/** 其调用仅做探查的工具。 */
 const READ_TOOLS = new Set(['read', 'read_image', 'grep', 'glob', 'list', 'lsp', 'fs_search', 'web_search', 'web_fetch'])
 
-/** Tools whose calls only search rather than open a known file. */
+/** 其调用只做搜索、而不打开已知文件的工具。 */
 const SEARCH_TOOLS = new Set(['grep', 'glob', 'web_search', 'web_fetch', 'fs_search'])
 
-/** Tools that change files. */
+/** 会修改文件的工具。 */
 const WRITE_TOOLS = new Set(['write', 'edit', 'str_replace', 'multi_edit', 'apply_patch'])
 
-/** Tools that execute a command or program. */
+/** 会执行命令或程序的工具。 */
 const EXEC_TOOLS = new Set(['bash', 'exec', 'test', 'build', 'lint', 'run_code'])
 
-/** Tools that hand control to a human. */
+/** 将控制权交给人的工具。 */
 const INTERACT_TOOLS = new Set(['approval', 'ask_user', 'user_question'])
 
-/** Display ceiling before older look-around cards are compressed. */
+/** 较早的探查卡片被压缩前的展示上限。 */
 const MAX_CARDS = 30
 
-/** Read one attribute as a string, or undefined. */
+/** 将一个属性读作字符串；不存在时返回 undefined。 */
 function attrString(span: ActivitySpan, key: string): string | undefined {
   const value = span.attributes?.[key]
   return typeof value === 'string' ? value : undefined
 }
 
-/** File count of one look-around card; tool look-around cards always carry it. */
-/* v8 ignore next 3 -- tool look-around cards are built with numeric counts. */
+/** 一张探查卡片的文件计数；工具探查卡片总是带有该值。 */
+/* v8 ignore next 3 -- 工具探查卡片在构建时总会带上数值计数。 */
 function metaCount(card: ChainCard, key: 'files' | 'searches'): number {
   const value = card.meta?.[key]
   return typeof value === 'number' ? value : 0
 }
 
-/** Target path of one change card, which always carries the change title. */
+/** 一张变更卡片的目标路径；变更卡片总是带有变更标题。 */
 function metaPath(card: ChainCard): string {
-  /* v8 ignore next -- every card reaching this helper was built as a change card. */
+  /* v8 ignore next -- 到达此辅助函数的每张卡片都按变更卡片构建。 */
   return card.title.copy === 'change' ? card.title.path : ''
 }
 
-/** Whole seconds a span lasted, or 0 while it runs. */
+/** 跨度持续的总秒数；跨度仍在运行时为 0。 */
 function seconds(span: ActivitySpan): number {
   return span.endTime === undefined ? 0 : Math.max(0, Math.round((span.endTime - span.startTime) / 1000))
 }
 
-/** Deterministic bigram similarity in [0, 1]; 1 means equal after normalization. */
+/** 确定性的二元组相似度，取值在 [0, 1]；为 1 表示归一化后完全相同。 */
 function similarity(left: string, right: string): number {
   const a = left.replace(/\s+/g, '').toLowerCase()
   const b = right.replace(/\s+/g, '').toLowerCase()
@@ -70,27 +70,27 @@ function similarity(left: string, right: string): number {
   return (2 * overlap) / (a.length - 1 + b.length - 1)
 }
 
-/** Command text of one execution span. */
+/** 单次执行跨度的命令文本。 */
 function verifyCommand(span: ActivitySpan): string {
   return attrString(span, 'command') ?? span.name
 }
 
-/** File path a span changed. */
+/** 该跨度变更的文件路径。 */
 function changePath(span: ActivitySpan): string {
   return attrString(span, 'path') ?? attrString(span, 'file') ?? span.name
 }
 
-/** Summary title of a look-around card covering the given totals. */
+/** 覆盖给定总计的探查卡片汇总标题。 */
 function reconTitle(files: number, searches: number): ChainTitle {
   return { copy: 'recon', files, searches }
 }
 
-/** Whether a card came from a read or search tool rather than a subagent hand-off. */
+/** 卡片是否来自读取或搜索工具，而非子代理交接。 */
 function isToolRecon(card: ChainCard): boolean {
   return card.title.copy === 'recon'
 }
 
-/** Build the card one span contributes, or null when the span only supports a parent card. */
+/** 构建一个跨度所贡献的卡片；当该跨度仅支撑父卡片时返回 null。 */
 function baseCard(span: ActivitySpan): ChainCard | null {
   if (span.kind === 'turn') {
     const intent = attrString(span, 'intent')
@@ -143,8 +143,8 @@ function baseCard(span: ActivitySpan): ChainCard | null {
     }
   }
 
-  // A deletion hides inside any tool name, so it is classified before the
-  // execution set; `bash rm` must not read as a verification.
+  // 删除可能藏在任意工具名下，因此要在执行类集合之前分类；`bash rm` 不得被
+  // 读作一次校验。
   if (attrString(span, 'op') === 'delete' || span.name === 'delete') {
     const path = changePath(span)
     return {
@@ -190,8 +190,8 @@ function baseCard(span: ActivitySpan): ChainCard | null {
   }
 
   const tool = span.name
-  // A search tool counts as a search even when it opens a file; one card's
-  // totals must not depend on whether it later merges with its neighbour.
+  // 搜索工具即使打开了文件也只计为一次搜索；单张卡片的总计不得取决于它之后
+  // 是否会与相邻卡片合并。
   const files = SEARCH_TOOLS.has(tool) ? 0 : READ_TOOLS.has(tool) && attrString(span, 'path') !== undefined ? 1 : 0
   const searches = SEARCH_TOOLS.has(tool) ? 1 : 0
   return {
@@ -205,7 +205,7 @@ function baseCard(span: ActivitySpan): ChainCard | null {
   }
 }
 
-/** Merge adjacent look-around cards into one counted summary. */
+/** 把相邻的探查卡片合并为一张带计数的汇总卡片。 */
 function mergeRecon(cards: readonly ChainCard[]): ChainCard[] {
   const out: ChainCard[] = []
   for (const card of cards) {
@@ -226,7 +226,7 @@ function mergeRecon(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
-/** Merge change cards targeting one file; the merged card keeps the first edit's position. */
+/** 合并指向同一文件的变更卡片；合并后的卡片保留首次编辑的位置。 */
 function mergeChanges(cards: readonly ChainCard[]): ChainCard[] {
   const positions = new Map<string, number>()
   const out: ChainCard[] = []
@@ -253,7 +253,7 @@ function mergeChanges(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
-/** Keep failed verifications standalone and fold long success runs. */
+/** 失败的校验保持独立，较长的连续成功校验则折叠。 */
 function foldVerifies(cards: readonly ChainCard[]): ChainCard[] {
   const out: ChainCard[] = []
   let run: ChainCard[] = []
@@ -283,13 +283,13 @@ function foldVerifies(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
-/** Text an intent card shows verbatim. */
+/** 意图卡片原样展示的文本。 */
 function intentText(card: ChainCard): string {
-  /* v8 ignore next -- dedupeIntents compares intent cards only, so the recorded-text arm always applies. */
+  /* v8 ignore next -- dedupeIntents 只比较意图卡片，因此始终走记录文本这一分支。 */
   return card.title.copy === 'intent' ? card.title.text : ''
 }
 
-/** Drop near-duplicate intents unless a failure or interruption forces a new one. */
+/** 丢弃近似重复的意图，除非失败或中断强制产生新的意图。 */
 function dedupeIntents(cards: readonly ChainCard[]): ChainCard[] {
   const out: ChainCard[] = []
   for (const card of cards) {
@@ -310,7 +310,7 @@ function dedupeIntents(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
-/** Compress the chain below the display ceiling, look-around cards first. */
+/** 将链路压缩到展示上限以内，优先压缩探查卡片。 */
 function capCards(cards: readonly ChainCard[]): ChainCard[] {
   const out = [...cards]
   while (out.length > MAX_CARDS) {
@@ -338,7 +338,7 @@ function capCards(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
-/** Build the closing card summarizing changes and verifications. */
+/** 构建汇总变更与校验的收尾卡片。 */
 function resultCard(spans: readonly ActivitySpan[], cards: readonly ChainCard[]): ChainCard {
   const files = new Set(cards.filter(card => card.kind === 'change').map(card => metaPath(card)))
   const verifications = cards.filter(card => card.kind === 'verify').length
@@ -355,10 +355,10 @@ function resultCard(spans: readonly ActivitySpan[], cards: readonly ChainCard[])
 }
 
 /**
- * Project folded activity spans into the review execution chain.
- * @param spans - collection-layer spans in ascending sequence order.
- * @param userText - the user's task text, used only by the out-of-scope heuristic.
- * @returns cards in display order and risk flags ordered by severity.
+ * 将折叠后的活动跨度投影为评审执行链。
+ * @param spans - 采集层的跨度，按序号升序排列。
+ * @param userText - 用户的任务文本，仅用于范围外启发式判断。
+ * @returns 按展示顺序排列的卡片，以及按严重程度排序的风险标记。
  */
 export function chainFromSpans(spans: readonly ActivitySpan[], userText = ''): ChainResult {
   const ordered = [...spans].sort((left, right) => left.seq - right.seq)

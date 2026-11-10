@@ -1,97 +1,94 @@
 /**
- * Review-oriented activity types shared by the collection and presentation
- * layers.
+ * 采集层与展示层共用的、面向评审的活动类型。
  *
  * @module @deepseek-ai/dsh-agent-activity
  */
 
-/** One folded activity span produced by the collection layer. */
+/** 采集层生成的一个折叠后的活动跨度。 */
 export interface ActivitySpan {
-  /** Sequence number of the span's first contributing session event. */
+  /** 该跨度首个贡献会话事件的序号。 */
   readonly seq: number
-  /** Span family that owns the timing. */
+  /** 计时所属的跨度类别。 */
   readonly kind: 'turn' | 'step' | 'request' | 'tool' | 'subagent' | 'workflow' | 'compaction'
-  /** Tool name, workflow phase, subagent label, or turn label. */
+  /** 工具名、工作流阶段、子代理标签或回合标签。 */
   readonly name: string
-  /** Epoch milliseconds at which the span opened. */
+  /** 跨度开启时的纪元毫秒数。 */
   readonly startTime: number
-  /** Epoch milliseconds at which the span closed; absent while it runs. */
+  /** 跨度关闭时的纪元毫秒数；跨度运行期间不存在。 */
   readonly endTime?: number | undefined
-  /** Settlement state of the span. */
+  /** 该跨度的结束状态。 */
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
   /**
-   * Presentation facts the collection layer attached to this span: the model's
-   * tool arguments, a bash removal's derived `path` and `op`, the turn's
-   * one-line `intent`, and the recorded `callId` that addresses a tool call in
-   * an inspection view.
+   * 采集层附加到该跨度上的展示信息：模型给出的工具参数、bash 删除操作派生的
+   * `path` 和 `op`、回合的单行 `intent`，以及在检查视图中定位某次工具调用的
+   * 已记录 `callId`。
    */
   readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined
 }
 
-/** The six card kinds a review reader can see. */
+/** 评审者可见的六种卡片类别。 */
 export type ChainKind = 'intent' | 'recon' | 'change' | 'verify' | 'interrupt' | 'result'
 
-/** Visual state of one chain card. */
+/** 单张链路卡片的视觉状态。 */
 export type ChainStatus = 'ok' | 'error' | 'running' | 'warning'
 
-/** File operation one change card records. */
+/** 一张变更卡片记录的文件操作。 */
 export type ChangeOp = 'create' | 'update' | 'delete'
 
 /**
- * One card title: the message the presentation layer renders together with the
- * values it interpolates. Recorded text stays verbatim; every other variant
- * names a message the reader's locale dictionary owns.
+ * 一张卡片的标题：展示层渲染的消息，以及该消息插值所用的值。已记录的文本保持
+ * 原样；其他每种变体只指明一条由读者所在语言字典提供的消息。
  */
 export type ChainTitle =
-  /** The turn's own intent sentence, shown as recorded. */
+  /** 回合自身的意图语句，按记录原样展示。 */
   | { readonly copy: 'intent'; readonly text: string }
-  /** Look-around work merged into counted totals. */
+  /** 被合并为计数总计的探查类工作。 */
   | { readonly copy: 'recon'; readonly files: number; readonly searches: number }
-  /** Look-around compressed to reach the display ceiling. */
+  /** 为达到展示上限而被压缩的探查类工作。 */
   | { readonly copy: 'reconCollapsed' }
-  /** One subagent hand-off. */
+  /** 一次子代理交接。 */
   | { readonly copy: 'subagent'; readonly name: string }
-  /** One workflow phase that settled normally. */
+  /** 一个正常结束的工作流阶段。 */
   | { readonly copy: 'workflowCompleted'; readonly name: string }
-  /** One workflow phase that settled in error. */
+  /** 一个以错误结束的工作流阶段。 */
   | { readonly copy: 'workflowFailed'; readonly name: string }
-  /** A tool call that handed control to a human. */
+  /** 一次将控制权交给人的工具调用。 */
   | { readonly copy: 'interrupt'; readonly seconds: number }
-  /** One file creation, modification, or deletion. */
+  /** 一次文件创建、修改或删除。 */
   | { readonly copy: 'change'; readonly op: ChangeOp; readonly path: string }
-  /** A command that settled normally. */
+  /** 一条正常结束的命令。 */
   | { readonly copy: 'verifyPassed'; readonly command: string }
-  /** A command that settled in error, with the failure code when one was recorded. */
+  /** 一条以错误结束的命令；若记录了失败码，则一并给出。 */
   | { readonly copy: 'verifyFailed'; readonly command: string; readonly errorCode?: string | undefined }
-  /** A folded run of successful verifications. */
+  /** 一段被折叠的连续成功校验。 */
   | { readonly copy: 'verifyRun'; readonly count: number }
-  /** The closing summary of changed files and verifications. */
+  /** 变更文件与校验的收尾汇总。 */
   | { readonly copy: 'result'; readonly files: number; readonly verifications: number }
 
-/** One readable step of the execution chain. */
+/** 执行链中一个可读的步骤。 */
 export interface ChainCard {
-  /** Stable identifier derived from the kind and first contributing sequence. */
+  /** 由类别与首个贡献序号推导出的稳定标识符。 */
   readonly id: string
-  /** Presentation kind. */
+  /** 展示类别。 */
   readonly kind: ChainKind
-  /** One-line summary shown without expansion, for the presentation layer to localize. */
+  /** 未展开时显示的单行摘要，由展示层负责本地化。 */
   readonly title: ChainTitle
-  /** Epoch milliseconds at which the card opened. */
+  /** 卡片开启时的纪元毫秒数。 */
   readonly startedAt: number
-  /** Visual state derived from the underlying spans and risk flags. */
+  /** 由底层跨度与风险标记推导出的视觉状态。 */
   readonly status: ChainStatus
-  /** Sequence numbers a reader can open to check the card. */
+  /** 评审者可打开以核对这张卡片的序号。 */
   readonly evidenceSeqs: readonly number[]
-  /** Number of merged occurrences, for repeated work on one target. */
+  /** 合并后的出现次数，用于同一目标上的重复工作。 */
   readonly repeat?: number | undefined
-  /** Machine facts the presentation layer can read without parsing titles. */
+  /** 展示层无需解析标题即可读取的机器可读信息。 */
   readonly meta?: Readonly<Record<string, string | number>> | undefined
 }
 
-/** Severity of a review risk flag. */
+/** 评审风险标记的严重程度。 */
 export type RiskSeverity = 'danger' | 'warn' | 'info'
 
-/** One rule's finding: the message the presentation layer localizes, plus its counts. */
+/** 单条规则的发现：由展示层本地化的消息，以及相应计数。 */
 export type RiskReason =
   | { readonly copy: 'touchesTests' }
   | { readonly copy: 'touchesCi' }
@@ -101,32 +98,32 @@ export type RiskReason =
   | { readonly copy: 'gaveUp' }
   | { readonly copy: 'planChurn'; readonly count: number }
 
-/** One review risk attached to the chain. */
+/** 附加到链路上的一项评审风险。 */
 export interface RiskFlag {
-  /** Stable rule name. */
+  /** 稳定的规则名。 */
   readonly code: string
-  /** How strongly the flag blocks a confident review. */
+  /** 该标记对可靠评审的阻断程度。 */
   readonly severity: RiskSeverity
-  /** Reader-facing reason, for the presentation layer to localize. */
+  /** 面向评审者的原因，由展示层负责本地化。 */
   readonly reason: RiskReason
-  /** Files the rule matched. */
+  /** 该规则匹配到的文件。 */
   readonly evidenceFiles: readonly string[]
 }
 
-/** Projection result handed to the presentation layer. */
+/** 交给展示层的投影结果。 */
 export interface ChainResult {
-  /** Cards in display order, ending with the result card. */
+  /** 按展示顺序排列的卡片，以结果卡片结尾。 */
   readonly cards: readonly ChainCard[]
-  /** Risk flags ordered by severity. */
+  /** 按严重程度排序的风险标记。 */
   readonly flags: readonly RiskFlag[]
 }
 
-/** Whole-log counters derived from spans, carried incrementally by the fold. */
+/** 由跨度推导出的全日志计数器，由折叠过程增量维护。 */
 export interface ActivitySummary {
-  /** Opening counts by span family. */
+  /** 按跨度类别统计的开启次数。 */
   readonly spansByKind: Readonly<Record<ActivitySpan['kind'], number>>
-  /** Current settlement counts; `running` counts spans still open. */
+  /** 当前的结束状态计数；`running` 统计仍处于打开状态的跨度。 */
   readonly spansByStatus: Readonly<Record<ActivitySpan['status'], number>>
-  /** Summed wall time of settled spans by family, in milliseconds. */
+  /** 按类别统计的已结束跨度实际耗时之和，单位为毫秒。 */
   readonly durationByKind: Readonly<Record<ActivitySpan['kind'], number>>
 }

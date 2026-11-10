@@ -1,11 +1,11 @@
 /**
- * Review-chain view copy.
+ * 评审链视图的文案。
  */
 
-/** Locale namespace of the review-chain view. */
+/** 评审链视图的 locale 命名空间。 */
 export const NS = 'agentChain'
 
-/** English dictionary. */
+/** 英语词典。 */
 export const en = {
   'view.chain': 'Chain',
   'banner.risks': 'Review risks',
@@ -64,7 +64,7 @@ export const en = {
   'risk.planChurn': 'The objective changed {count} times in this session',
 } as const
 
-/** Chinese dictionary. */
+/** 中文词典。 */
 export const zh = {
   'view.chain': '执行链',
   'banner.risks': '评审风险',
@@ -123,7 +123,7 @@ export const zh = {
   'risk.planChurn': '会话内目标变更 {count} 次',
 } as const
 
-/** Japanese dictionary. */
+/** 日语词典。 */
 export const ja = {
   'view.chain': '実行チェーン',
   'banner.risks': 'レビュー上のリスク',
@@ -182,7 +182,7 @@ export const ja = {
   'risk.planChurn': 'セッション内で目標が {count} 回変更されました',
 } as const
 
-/** Spanish dictionary. */
+/** 西班牙语词典。 */
 export const es = {
   'view.chain': 'Cadena',
   'banner.risks': 'Riesgos de revisión',
@@ -241,7 +241,7 @@ export const es = {
   'risk.planChurn': 'El objetivo cambió {count} veces en esta sesión',
 } as const
 
-/** French dictionary. */
+/** 法语词典。 */
 export const fr = {
   'view.chain': 'Chaîne',
   'banner.risks': 'Risques de revue',
@@ -300,7 +300,7 @@ export const fr = {
   'risk.planChurn': 'L’objectif a changé {count} fois dans cette session',
 } as const
 
-/** German dictionary. */
+/** 德语词典。 */
 export const de = {
   'view.chain': 'Kette',
   'banner.risks': 'Review-Risiken',
@@ -359,7 +359,7 @@ export const de = {
   'risk.planChurn': 'Das Ziel änderte sich in dieser Sitzung {count} Mal',
 } as const
 
-/** Russian dictionary. */
+/** 俄语词典。 */
 export const ru = {
   'view.chain': 'Цепочка',
   'banner.risks': 'Риски ревью',
@@ -418,7 +418,7 @@ export const ru = {
   'risk.planChurn': 'Цель менялась в этой сессии {count} раз',
 } as const
 
-/** Portuguese dictionary. */
+/** 葡萄牙语词典。 */
 export const pt = {
   'view.chain': 'Cadeia',
   'banner.risks': 'Riscos de revisão',
@@ -477,5 +477,5 @@ export const pt = {
   'risk.planChurn': 'O objetivo mudou {count} vezes nesta sessão',
 } as const
 
-/** Keys this namespace provides. */
+/** 此命名空间提供的键。 */
 export type AgentChainKey = keyof typeof en

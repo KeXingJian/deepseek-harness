@@ -1,5 +1,5 @@
 /**
- * Review-chain conversation view: one target whose snapshot is the whole chain.
+ * 评审链会话视图：只有一个 target，其快照就是整条链。
  */
 
 import type {
@@ -7,27 +7,27 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ActivitySpan, ChainCard, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
 
-/** What the view renders: the projected chain for one Session. */
+/** 视图渲染的内容：某个 Session 投影出的链。 */
 export interface ChainSnapshot {
-  /** Cards in display order. */
+  /** 按展示顺序排列的卡片。 */
   readonly cards: readonly ChainCard[]
-  /** Review risk flags ordered by severity. */
+  /** 按严重程度排序的评审风险标记。 */
   readonly flags: readonly RiskFlag[]
-  /** Every span the cards cite, in log order; expansion reads them by sequence. */
+  /** 卡片引用的所有 span，按日志顺序排列；展开时按序号读取它们。 */
   readonly spans: readonly ActivitySpan[]
 }
 
-/** Snapshot before the Session publishes any chain node. */
+/** Session 尚未发布任何链节点时的快照。 */
 export const EMPTY_CHAIN: ChainSnapshot = { cards: [], flags: [], spans: [] }
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationViewSnapshotMap {
-    /** Review chain snapshot published by the agent-chain target. */
+    /** 由 agent-chain target 发布的评审链快照。 */
     'agent-chain': ChainSnapshot
   }
 }
 
-/** Builder collecting the single chain node this target publishes. */
+/** 收集该 target 发布的唯一链节点的构建器。 */
 class ChainSnapshotBuilder implements ConversationViewBuilder<ConversationViewNode, ChainSnapshot> {
   readonly empty = EMPTY_CHAIN
   private readonly nodes = new Map<string, ConversationViewNode>()
@@ -49,7 +49,7 @@ class ChainSnapshotBuilder implements ConversationViewBuilder<ConversationViewNo
   }
 }
 
-/** Conversation view definition for the review chain. */
+/** 评审链的会话视图定义。 */
 export const chainViewDefinition: ConversationViewDefinition<ConversationViewNode, ChainSnapshot> = {
   target: 'agent-chain',
   create: () => new ChainSnapshotBuilder(),

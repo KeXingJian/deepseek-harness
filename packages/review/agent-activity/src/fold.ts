@@ -1,5 +1,5 @@
 /**
- * Folding from durable Session events to activity spans.
+ * 从持久化的 Session 事件折叠出活动跨度。
  *
  * @module @deepseek-ai/dsh-agent-activity
  */
@@ -8,51 +8,51 @@ import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types
 import { emptyActivitySummary, openActivitySpan, settleActivitySpan } from './aggregate.ts'
 import type { ActivitySpan, ActivitySummary } from './types.ts'
 
-/** Attributes a span accepts while it is being built. */
+/** 跨度在构建过程中可接受的属性。 */
 type MutableAttributes = Record<string, string | number | boolean>
 
 /**
- * One fold state, JSON-serializable so a projection can checkpoint it.
+ * 一份折叠状态，可序列化为 JSON，以便投影为其做检查点。
  *
- * `open*` records map an owner identity to the index of its running span, so
- * one event updates one span without scanning the log or the span list.
+ * `open*` 记录把所有者标识映射到其运行中跨度的下标，因此一个事件只需更新一个
+ * 跨度，无需扫描日志或跨度列表。
  */
 export interface ActivityState {
-  /** Spans in sequence order. */
+  /** 按序号顺序排列的跨度。 */
   spans: ActivitySpan[]
-  /** Running turn number to span index. */
+  /** 运行中回合编号到跨度下标的映射。 */
   openTurns: Record<string, number>
-  /** Running `turn:step` pair to span index. */
+  /** 运行中 `turn:step` 组合到跨度下标的映射。 */
   openSteps: Record<string, number>
-  /** Running tool call id to span index. */
+  /** 运行中工具调用 id 到跨度下标的映射。 */
   openCalls: Record<string, number>
-  /** Whole-log counters advanced by the same open/close transitions. */
+  /** 由相同的启动/关闭转换推进的全日志计数器。 */
   summary: ActivitySummary
 }
 
-/** Argument keys a review chain reads. */
+/** 评审链路会读取的参数键。 */
 const READ_ARGUMENTS = ['path', 'file', 'command', 'pattern', 'op'] as const
 
-/** Target of a shell removal command, or the command itself when it names no operand. */
+/** shell 删除命令的目标；当命令未指明操作数时，返回命令本身。 */
 function removalTarget(command: string): string | undefined {
   if (!/^rm(\s|$)/.test(command)) return undefined
   const operands = command.split(/\s+/).filter(token => token !== '' && !token.startsWith('-')).slice(1)
   return operands.at(-1) ?? command
 }
 
-/** Read one string field from a parsed argument object. */
+/** 从解析后的参数对象中读取一个字符串字段。 */
 function argumentString(source: object, key: string): string | undefined {
   const value = (source as Record<string, unknown>)[key]
   return typeof value === 'string' ? value : undefined
 }
 
-/** Extract review-relevant attributes from model-produced tool arguments. */
+/** 从模型生成的工具参数中提取与评审相关的属性。 */
 function attributesOf(argumentsJson: string): MutableAttributes {
   let parsed: unknown
   try {
     parsed = JSON.parse(argumentsJson)
   } catch {
-    // Tool arguments are model output; malformed JSON simply carries no parsed attributes.
+    // 工具参数是模型输出；格式错误的 JSON 只是不携带任何已解析属性。
     return {}
   }
   if (typeof parsed !== 'object' || parsed === null) return {}
@@ -64,7 +64,7 @@ function attributesOf(argumentsJson: string): MutableAttributes {
   return attributes
 }
 
-/** Map a turn-end reason to a span status. */
+/** 将回合结束原因映射为跨度状态。 */
 function statusOf(reason: TurnEndReason): ActivitySpan['status'] {
   switch (reason.kind) {
     case 'error':
@@ -77,7 +77,7 @@ function statusOf(reason: TurnEndReason): ActivitySpan['status'] {
   }
 }
 
-/** First non-empty text block of an assistant message, if any. */
+/** 助手消息的第一个非空文本块（如果存在）。 */
 function intentOf(content: readonly { type: string; text?: string }[]): string | undefined {
   for (const block of content) {
     if (block.type !== 'text') continue
@@ -87,14 +87,14 @@ function intentOf(content: readonly { type: string; text?: string }[]): string |
   return undefined
 }
 
-/** Replace one span, preserving every other span reference. */
+/** 替换一个跨度，并保留其余所有跨度引用。 */
 function closed(state: ActivityState, index: number, previous: ActivitySpan, span: ActivitySpan): ActivityState {
   const spans = [...state.spans]
   spans[index] = span
   return { ...state, spans, summary: settleActivitySpan(state.summary, previous, span) }
 }
 
-/** Append one opening span and account it once. */
+/** 追加一个开启中的跨度，并将其计入一次。 */
 function opened(state: ActivityState, span: ActivitySpan): ActivityState {
   return {
     ...state,
@@ -103,7 +103,7 @@ function opened(state: ActivityState, span: ActivitySpan): ActivityState {
   }
 }
 
-/** Drop one owner key from a record. */
+/** 从记录中移除一个所有者键。 */
 function released(record: Record<string, number>, key: string): Record<string, number> {
   const next: Record<string, number> = {}
   for (const [owner, index] of Object.entries(record)) {
@@ -113,18 +113,18 @@ function released(record: Record<string, number>, key: string): Record<string, n
 }
 
 /**
- * Create one empty fold state.
- * @returns state with no spans and no open owners.
+ * 创建一份空的折叠状态。
+ * @returns 不含任何跨度、也没有开启中所有者的状态。
  */
 export function initActivityState(): ActivityState {
   return { spans: [], openTurns: {}, openSteps: {}, openCalls: {}, summary: emptyActivitySummary() }
 }
 
 /**
- * Apply one committed Session event to a fold state.
- * @param state - the current state; it is never mutated.
- * @param event - the event in log order.
- * @returns the next state, or the same reference when the event changes nothing.
+ * 将一个已提交的 Session 事件应用到折叠状态。
+ * @param state - 当前状态；永不被修改。
+ * @param event - 按日志顺序排列的事件。
+ * @returns 下一个状态；若该事件没有改变任何内容，则返回同一个引用。
  */
 export function applyActivityEvent(state: ActivityState, event: SessionEvent): ActivityState {
   switch (event.type) {
@@ -189,8 +189,8 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
           attributes.path = target
         }
       }
-      // The call identity is not a model-produced argument: it is recorded so a
-      // span-only projection can still address this call in an inspection view.
+      // 调用标识并非模型生成的参数：记录它是为了让仅有跨度的投影仍能在检查视图
+      // 中定位这次调用。
       attributes.callId = String(event.data.callId)
       const span: ActivitySpan = {
         seq: event.seq,
@@ -227,27 +227,27 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
 }
 
 /**
- * Incremental folder over one Session's events.
+ * 对单个 Session 的事件做增量折叠的折叠器。
  *
- * A carrier that sees events arrive keeps one folder per Session instead of
- * re-folding the log, so a live view costs one call per event.
+ * 能看到事件到达的载体为每个 Session 保留一个折叠器，而不是重新折叠整份日志，
+ * 因此实时视图的代价是每个事件一次调用。
  */
 export interface ActivityFolder {
   /**
-   * Apply one committed Session event.
-   * @param event - the event in log order.
+   * 应用一个已提交的 Session 事件。
+   * @param event - 按日志顺序排列的事件。
    */
   apply(event: SessionEvent): void
   /**
-   * Read the spans recorded so far, in sequence order.
-   * @returns the current spans; callers must not mutate them.
+   * 读取目前记录的跨度，按序号顺序排列。
+   * @returns 当前的跨度；调用方不得修改它们。
    */
   snapshot(): ActivitySpan[]
 }
 
 /**
- * Create one incremental folder.
- * @returns a folder that accepts committed events in log order.
+ * 创建一个增量折叠器。
+ * @returns 按日志顺序接收已提交事件的折叠器。
  */
 export function createActivityFolder(): ActivityFolder {
   let state = initActivityState()
@@ -260,9 +260,9 @@ export function createActivityFolder(): ActivityFolder {
 }
 
 /**
- * Fold durable Session events into activity spans for the review chain.
- * @param events - the session log in ascending sequence order.
- * @returns spans in sequence order; a span whose closing event never arrived stays running.
+ * 将持久化的 Session 事件折叠成供评审链路使用的活动跨度。
+ * @param events - 按序号升序排列的会话日志。
+ * @returns 按序号顺序排列的跨度；关闭事件始终未到达的跨度保持运行中状态。
  */
 export function foldActivity(events: readonly SessionEvent[]): ActivitySpan[] {
   const folder = createActivityFolder()

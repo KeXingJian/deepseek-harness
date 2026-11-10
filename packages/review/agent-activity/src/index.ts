@@ -1,5 +1,5 @@
 /**
- * Review-oriented activity projection for the DeepSeek Harness.
+ * DeepSeek Harness 中面向评审的活动投影。
  *
  * @module @deepseek-ai/dsh-agent-activity
  */

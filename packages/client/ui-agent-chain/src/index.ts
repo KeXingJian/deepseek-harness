@@ -1,6 +1,6 @@
 /**
- * Web review-chain plugin, node half: the projection lives in the browser.
+ * Web 评审链插件，Node 半边：投影逻辑位于浏览器端。
  */
 
-/** Host plugin body — the review chain is a browser-side conversation view. */
+/** Host 插件主体 —— 评审链是浏览器侧的会话视图。 */
 export function apply(): void {}

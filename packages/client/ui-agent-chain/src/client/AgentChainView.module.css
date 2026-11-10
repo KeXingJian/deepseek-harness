@@ -1,6 +1,6 @@
-/* Review-chain view: a readable column of cards inside the conversation
-   scrollport. The parent scrolls, so this root keeps normal flow (no internal
-   scrollport, no fixed height) and only bounds its width to the transcript. */
+/* 评审链视图：会话滚动区域内一列可读的卡片。父容器负责滚动，因此此根元素
+   保持正常文档流（没有内部滚动区域，也没有固定高度），只把宽度约束到
+   转录的宽度。 */
 
 .root {
   display: flex;
@@ -256,7 +256,7 @@
   font: var(--dsw-font-xxs-12);
 }
 
-/* A file row opens the preview beside the conversation instead of reading as text. */
+/* 文件行会在会话旁打开预览，而不是作为纯文本呈现。 */
 .fileLink {
   padding: 0;
   border: 0;
