@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/review/agent-activity/README.md
 /:
-  en: a9f8b30d8c06a4e4
-  zh: 68b1e05f74afa7bd
+  en: 154c5c9690e0b374
+  zh: 2858c7fc894e3428
 /deepseek-ai-dsh-agent-activity:
   en: 457778710398048b
   zh: 64a30ebd6cffafab
@@ -15,14 +15,14 @@
   en: d152484eb41ac6b4
   zh: 405b30feaf48c087
 /deepseek-ai-dsh-agent-activity/use-this-package:
-  en: dcc01e8bab917e3f
-  zh: 80be796c6b230677
+  en: f9ad24c2b0a7f86c
+  zh: 6fba6472d3af6168
 /deepseek-ai-dsh-agent-activity/use-this-package/folding-a-session-log:
   en: d667781b325e255a
   zh: ccefacda740c2ee4
 /deepseek-ai-dsh-agent-activity/use-this-package/cards:
-  en: 27604086c6fa97ed
-  zh: 2042061809ee4862
+  en: a1066b6f1c079beb
+  zh: 099abded72a57dda
 /deepseek-ai-dsh-agent-activity/use-this-package/risk-flags:
   en: 224df92b727168e9
   zh: 2fcafaade4da954c
@@ -39,8 +39,8 @@
   en: ca75c51c89c2c9b0
   zh: 4fd78cfe2f71d092
 /deepseek-ai-dsh-agent-activity/known-limitations-and-deferred-work:
-  en: ef096389d1bf0575
-  zh: b48beb559f24e288
+  en: 87b2fbc970bf734d
+  zh: 7ebfba98c01913b1
 /deepseek-ai-dsh-agent-activity/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 08ac90a2efebf8ad

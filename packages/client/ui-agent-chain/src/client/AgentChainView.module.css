@@ -134,6 +134,14 @@
   font: var(--dsw-font-xxs-12);
 }
 
+.actions {
+  min-width: 0;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
 .toggle {
   display: inline-flex;
   flex: none;
@@ -158,6 +166,22 @@
 
 .toggle:focus-visible {
   outline-offset: 1px;
+}
+
+/* 思考卡片的行动子卡：一条竖线表示归属，子卡自带标题与展开控件。 */
+.children {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 0;
+  padding: 0 0 0 10px;
+  gap: 2px;
+  list-style: none;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* 改动卡片的差异块：与展开事实同属二级内容，宽度受卡片约束。 */
+.diffBody {
+  min-width: 0;
 }
 
 .chevron {

@@ -34,6 +34,74 @@ describe('intent cards', () => {
     const result = chainFromSpans([span(1, 'turn', 'turn:1', { attributes: { intent } })])
     expect(result.cards[0]?.title).toEqual({ copy: 'intent', text: intent.slice(0, 60) })
   })
+
+  it('renders the human prompt before the intent, cited by its own event', () => {
+    const result = chainFromSpans([
+      span(2, 'turn', 'turn:1', { attributes: { prompt: '修复登录页', promptSeq: 1, intent: '检查登录流程' } }),
+    ])
+    expect(result.cards.slice(0, 2)).toMatchObject([
+      { kind: 'prompt', title: { copy: 'prompt', text: '修复登录页' }, evidenceSeqs: [1], meta: { prompt: '修复登录页' } },
+      { kind: 'intent', title: { copy: 'intent', text: '检查登录流程' } },
+    ])
+  })
+
+  it('renders a prompt card for a turn without an intent', () => {
+    const result = chainFromSpans([span(1, 'turn', 'turn:1', { attributes: { prompt: '看下构建失败' } })])
+    expect(result.cards[0]).toMatchObject({ kind: 'prompt', evidenceSeqs: [1] })
+  })
+
+  it('truncates a long prompt', () => {
+    const prompt = 'x'.repeat(80)
+    const result = chainFromSpans([span(1, 'turn', 'turn:1', { attributes: { prompt } })])
+    expect(result.cards[0]?.title).toEqual({ copy: 'prompt', text: prompt.slice(0, 60) })
+  })
+})
+
+describe('thinking cards', () => {
+  it('renders a thinking card per step, cited by the assistant message', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '先看路由\n再改表单', thinkingSeq: 7 } }),
+    ])
+    expect(result.cards[0]).toMatchObject({
+      kind: 'thinking',
+      title: { copy: 'thinking', text: '先看路由 再改表单' },
+      evidenceSeqs: [7],
+      meta: { thinking: '先看路由\n再改表单' },
+    })
+  })
+
+  it('cites the step when no assistant sequence was recorded', () => {
+    const result = chainFromSpans([span(1, 'step', 'step:1:1', { attributes: { thinking: '思考' } })])
+    expect(result.cards[0]?.evidenceSeqs).toEqual([1])
+  })
+
+  it('summarizes the actions of the same step', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '读两个文件再改一个', thinkingSeq: 2 } }),
+      tool(2, 'read', { path: 'src/a.ts' }),
+      tool(3, 'grep', { pattern: 'x' }),
+      tool(4, 'edit', { path: 'src/b.ts' }),
+      tool(5, 'bash', { command: 'pnpm test' }),
+      tool(6, 'list', {}),
+      span(7, 'step', 'step:1:2', { attributes: { thinking: '下一步', thinkingSeq: 9 } }),
+    ])
+    expect(result.cards[0]?.actions).toEqual({ files: 1, searches: 1, changes: 1, verifications: 1 })
+    expect(result.cards.filter(card => card.kind === 'thinking')).toHaveLength(2)
+    expect(result.cards.filter(card => card.kind === 'thinking')[1]?.actions).toBeUndefined()
+  })
+
+  it('omits the action summary when the step only asked a human', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '需要确认', thinkingSeq: 2 } }),
+      tool(2, 'approval', {}),
+    ])
+    expect(result.cards[0]?.actions).toBeUndefined()
+  })
+
+  it('skips a step without recorded thinking', () => {
+    const result = chainFromSpans([span(1, 'step', 'step:1:1', { attributes: { thinking: '   ' } })])
+    expect(result.cards.map(card => card.kind)).toEqual(['result'])
+  })
 })
 
 describe('non-tool cards', () => {
@@ -68,6 +136,127 @@ describe('non-tool cards', () => {
       { kind: 'interrupt', title: { copy: 'interrupt', seconds: 4 }, status: 'warning' },
       { kind: 'interrupt', title: { copy: 'interrupt', seconds: 0 } },
     ])
+  })
+})
+
+describe('nested action cards', () => {
+  it('nests the step’s action cards under its thinking card', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '先看再改', thinkingSeq: 2 } }),
+      tool(3, 'read', { path: 'src/a.ts' }),
+      tool(4, 'edit', { path: 'src/b.ts' }),
+      span(5, 'step', 'step:1:2'),
+      tool(6, 'bash', { command: 'pnpm test' }),
+    ])
+    expect(result.cards.map(card => card.kind)).toEqual(['thinking', 'verify', 'result'])
+    expect(result.cards[0]?.children?.map(card => card.kind)).toEqual(['recon', 'change'])
+    expect(result.cards[0]?.children?.map(card => card.id)).toEqual(['recon:3', 'change:4'])
+  })
+
+  it('merges the nested cards of one step without leaving the step', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '改两处', thinkingSeq: 2 } }),
+      tool(3, 'edit', { path: 'src/b.ts' }),
+      tool(4, 'read', { path: 'src/a.ts' }),
+      tool(5, 'grep', { pattern: 'x' }),
+      tool(6, 'edit', { path: 'src/b.ts' }),
+      span(7, 'step', 'step:1:2', { attributes: { thinking: '再改同一文件', thinkingSeq: 8 } }),
+      tool(9, 'edit', { path: 'src/b.ts' }),
+    ])
+    expect(result.cards[0]?.children?.map(card => card.kind)).toEqual(['change', 'recon'])
+    expect(result.cards[0]?.children?.[1]?.title).toEqual({ copy: 'recon', files: 1, searches: 1 })
+    expect(result.cards[1]?.children).toMatchObject([
+      { kind: 'change', title: { copy: 'change', op: 'update', path: 'src/b.ts' } },
+    ])
+    expect(result.cards[1]?.children?.[0]?.repeat).toBeUndefined()
+  })
+
+  it('leaves actions flat when their step recorded no thinking', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1'),
+      tool(2, 'edit', { path: 'src/b.ts' }),
+    ])
+    expect(result.cards.map(card => card.kind)).toEqual(['change', 'result'])
+    expect(result.cards[0]?.children).toBeUndefined()
+  })
+
+  it('leaves a call without an owning step flat', () => {
+    const result = chainFromSpans([tool(1, 'edit', { path: 'src/b.ts' })])
+    expect(result.cards[0]).toMatchObject({ kind: 'change' })
+    expect(result.cards[0]?.children).toBeUndefined()
+  })
+
+  it('gives a thinking card no children field when its step did nothing', () => {
+    const result = chainFromSpans([span(1, 'step', 'step:1:1', { attributes: { thinking: '只想不做' } })])
+    expect(result.cards[0]?.children).toBeUndefined()
+  })
+
+  it('counts nested changes and verifications in the closing card', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '改一个文件再验证', thinkingSeq: 2 } }),
+      tool(3, 'edit', { path: 'src/b.ts' }),
+      tool(4, 'bash', { command: 'pnpm test' }),
+    ])
+    expect(result.cards.at(-1)).toMatchObject({ kind: 'result', title: { copy: 'result', files: 1, verifications: 1 } })
+  })
+
+  it('applies risk flags to nested change cards', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '改测试再跑一遍', thinkingSeq: 2 } }),
+      tool(3, 'edit', { path: 'tests/a.spec.ts' }),
+      tool(4, 'bash', { command: 'pnpm test' }),
+    ])
+    expect(result.flags.map(flag => flag.code)).toContain('touches-tests')
+    expect(result.cards[0]?.children?.[0]).toMatchObject({ kind: 'change', status: 'warning' })
+  })
+
+  it('reports an unverified nested change as a risk', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '只改不验', thinkingSeq: 2 } }),
+      tool(3, 'edit', { path: 'src/b.ts' }),
+    ])
+    expect(result.flags.map(flag => flag.code)).toContain('unverified')
+    expect(result.cards.at(-1)?.status).toBe('error')
+  })
+})
+
+describe('recorded diffs', () => {
+  const HUNK = { path: 'src/b.ts', oldText: 'a', newText: 'b' }
+
+  it('carries the diff recorded for a change call', () => {
+    const result = chainFromSpans([tool(1, 'edit', { path: 'src/b.ts', callId: 'call-1' })], '', {
+      'call-1': [HUNK],
+    })
+    expect(result.cards[0]?.diffs).toEqual([HUNK])
+  })
+
+  it('omits diffs for a call with no record, no id, or an empty record', () => {
+    const result = chainFromSpans([
+      tool(1, 'edit', { path: 'src/a.ts', callId: 'call-1' }),
+      tool(2, 'edit', { path: 'src/b.ts' }),
+      tool(3, 'edit', { path: 'src/c.ts', callId: 'call-2' }),
+    ], '', { 'call-1': [], 'call-2': [HUNK] })
+    expect(result.cards[0]?.diffs).toBeUndefined()
+    expect(result.cards[1]?.diffs).toBeUndefined()
+    expect(result.cards[2]?.diffs).toEqual([HUNK])
+  })
+
+  it('keeps a deletion’s diff on its error card', () => {
+    const result = chainFromSpans([tool(1, 'delete', { path: 'src/b.ts', callId: 'call-1' })], '', {
+      'call-1': [{ path: 'src/b.ts', oldText: 'gone', newText: '' }],
+    })
+    expect(result.cards[0]).toMatchObject({ kind: 'change', status: 'error' })
+    expect(result.cards[0]?.diffs).toEqual([{ path: 'src/b.ts', oldText: 'gone', newText: '' }])
+  })
+
+  it('concatenates the diffs of one file merged into a single card', () => {
+    const SECOND = { path: 'src/b.ts', oldText: 'b', newText: 'c' }
+    const result = chainFromSpans([
+      tool(1, 'edit', { path: 'src/b.ts', callId: 'call-1' }),
+      tool(2, 'edit', { path: 'src/b.ts', callId: 'call-2' }),
+    ], '', { 'call-1': [HUNK], 'call-2': [SECOND] })
+    expect(result.cards[0]).toMatchObject({ kind: 'change', repeat: 2 })
+    expect(result.cards[0]?.diffs).toEqual([HUNK, SECOND])
   })
 })
 

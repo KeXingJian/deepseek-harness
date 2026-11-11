@@ -1,5 +1,5 @@
 ---
-description: "Review-oriented execution chain: folds agent activity spans into six readable cards plus review risk flags."
+description: "Review-oriented execution chain: folds agent activity spans into eight readable cards plus review risk flags."
 kind: "package-reference"
 ---
 
@@ -25,7 +25,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Call `chainFromSpans(spans, userText?)` with collection-layer spans ordered by sequence and get back `{ cards, flags }`.
+Call `chainFromSpans(spans, userText?, diffs?)` with collection-layer spans ordered by sequence and get back `{ cards, flags }`.
 
 ```ts
 import { chainFromSpans } from '@deepseek-ai/dsh-agent-activity'
@@ -53,6 +53,8 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 
 | Kind | Source spans | Answers |
 |---|---|---|
+| `prompt` | `turn` carrying the human `user/message` as a `prompt` attribute | What was it asked to do |
+| `thinking` | `step` carrying the reasoning of its `assistant/message` | What did it reason before acting |
 | `intent` | `turn` carrying an `intent` attribute | What did it mean to do |
 | `recon` | `read`/`grep`/`glob`/`list`/`lsp` tools, subagent hand-offs | Where did it look |
 | `change` | `write`/`edit` tools and deletions | What did it change |
@@ -60,9 +62,13 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 | `interrupt` | approval and question tools | When did a human step in |
 | `result` | synthesized from the chain | What was delivered |
 
+A turn's `prompt` card cites the `user/message` that recorded it; synthetic user-role injections (plugin context, recalled history, goal continuations) are not human prompts and produce no card. A step that recorded reasoning produces one `thinking` card citing its `assistant/message`; that step's tool calls become its `children`, rendered as child cards under it, and the thinking card states their counts in `actions` so one row reads "thought this, then did that". A step without reasoning leaves its tool cards in the flat chain and produces no thinking card.
+
 Cards merge while preserving review meaning: adjacent look-around cards become one counted summary, repeated edits to one file become one card with a `repeat` count, failed verifications stay standalone, and long success runs collapse. The chain is capped so a long session still fits one screen.
 
-A card title is a `ChainTitle` message descriptor — which message applies and the values it interpolates — and `meta` repeats the same facts in machine form for expansion and for the risk rules. Only an `intent` title is recorded text. The consuming view maps each descriptor through its own locale dictionary, so the projection never writes product copy.
+A card title is a `ChainTitle` message descriptor — which message applies and the values it interpolates — and `meta` repeats the same facts in machine form for expansion and for the risk rules. Only `prompt`, `thinking`, and `intent` titles are recorded text. The consuming view maps each descriptor through its own locale dictionary, so the projection never writes product copy.
+
+A `change` card can also carry `diffs`: the before and after text the tool recorded for that file, one entry per applied hunk. The projection never computes a patch from them; it attaches what the caller supplies as `diffs`, keyed by tool-call id, and merging two edits of one file concatenates their hunks. That keeps span attributes small — the file text lives in the tool result the log already holds — while the view still renders a line diff.
 
 ### Risk flags
 
@@ -107,9 +113,12 @@ None; this package neither assembles nor sends a provider request.
 - **No service and no storage** — the package projects Session events or spans supplied by a caller; persistence, live delivery, and rendering belong to consuming plugins.
 - **Durable events only** — approvals, subagent hand-offs, and workflow phases are live Cordis events rather than Session records, so a chain folded from a log does not contain them.
 - **Intent quotes the model** — an `intent` card is the turn's first non-empty assistant text block, not a summary written by this package.
-- **Out-of-scope matching is a heuristic** — it compares changed paths with paths the session read and with the caller-supplied task text, and reports the result as an inference rather than a fact.
+- **Prompt quotes the first human message** — `prompt` is the turn's first human `user/message`, truncated in the title and bounded in `meta`; later human interjections in the same turn stay out of the chain.
+- **Thinking is per step** — a `thinking` card carries the reasoning of one step; reasoning that arrives without an open step is dropped, and a step's actions are counted by the classification the action cards use, so an unknown tool counts as neither a file nor a search.
+- **Out-of-scope matching is a heuristic** — it compares changed paths with paths the session read and with the task text (the caller's argument, or the prompts recorded in the chain), and reports the result as an inference rather than a fact.
 - **One consumer so far** — `dsh-client-ui-agent-chain` renders these cards and flags; navigation from a card back to its evidence belongs to that view.
 - **Deletion line counts are not inferred** — a deletion reports the file, not a removed-line total the session did not record.
+- **Diffs come from the caller** — a chain folded from spans alone carries no diffs; a caller that holds the recorded tool results passes them as `chainFromSpans`'s third argument, so a tool that records no `diffs` in its result shows its facts without one.
 - **The ceiling compresses look-around cards only** — a session that changed more than thirty distinct files still renders one card per file, because collapsing distinct files would hide exactly what a reviewer must read.
 
 <a id="dev-note"></a>

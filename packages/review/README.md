@@ -26,7 +26,7 @@ Choosing this group means the subject is human judgment of agent work. Anything 
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`agent-activity/`](agent-activity/README.md) | Projects folded activity spans into a six-card execution chain plus review risk flags | — (library) |
+| [`agent-activity/`](agent-activity/README.md) | Projects folded activity spans into an eight-card execution chain plus review risk flags | — (library) |
 | [`agent-trace/`](agent-trace/README.md) | Collects whole-log activity counters incrementally and persists a bounded summary for future review views | `ctx.agentTrace` |
 
 <a id="related-documentation"></a>

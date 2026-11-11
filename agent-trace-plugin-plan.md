@@ -4,7 +4,7 @@
 > 落点：**DSH 内置 Web 插件**（Host 采集 + Client 可视化）
 > 本版定位：**简易执行链是当前核心交付**；指标采集保留为底座，全量指标视图后置。
 
-> **实施现状**：链内核已落地为 `packages/review/agent-activity`（`@deepseek-ai/dsh-agent-activity`）——6 类卡片 + 7 条风险规则，44 个测试通过、该包源码 100% 覆盖，`typecheck` / `oxlint` / 文档门禁 21 项全绿。视图层已落地为 `packages/client/ui-agent-chain`（`@deepseek-ai/dsh-client-ui-agent-chain`）：`conversation.view` 标签、6 类卡片、三种筛选、逐卡展开与风险条；P3 评审联动（文件跳转右侧栏预览、依据行跳转轨迹、卡片发布来源 span）已完成，包内 `src/client` 逐文件覆盖率 100%。P4 采集底座已落地为 `packages/review/agent-trace`（`@deepseek-ai/dsh-agent-trace`）：增量计数 + `agent_trace` 存储域有界落盘 + `sessionQuery` 冷回填，默认挂载、不接任何 UI；增量 == 全量属性测试与逐文件 100% 覆盖通过。P5 打磨已完成：卡片标题与风险原因从中文常量改为语言无关的消息描述符（`ChainTitle` / `RiskReason`），由 `ui-agent-chain` 的 8 语言字典渲染，`--dsw-*` 令牌样式保持；三个录制用例的 golden 快照、逐变体的本地化用例、`docs/subsystems/review-chain.md` 子系统页与「两层投影」Agent Note 在同一次改动内落地。本文其余部分保留原始规划命名（如 `trace/agent-trace`），以本行为准。
+> **实施现状**：链内核已落地为 `packages/review/agent-activity`（`@deepseek-ai/dsh-agent-activity`）——8 类卡片 + 7 条风险规则，90 个测试通过、该包源码 100% 覆盖，`typecheck` / `oxlint` / 文档门禁 21 项全绿。视图层已落地为 `packages/client/ui-agent-chain`（`@deepseek-ai/dsh-client-ui-agent-chain`）：`conversation.view` 标签、8 类卡片、三种筛选、逐卡展开与风险条；P3 评审联动（文件跳转右侧栏预览、依据行跳转轨迹、卡片发布来源 span）已完成，包内 `src/client` 逐文件覆盖率 100%。P4 采集底座已落地为 `packages/review/agent-trace`（`@deepseek-ai/dsh-agent-trace`）：增量计数 + `agent_trace` 存储域有界落盘 + `sessionQuery` 冷回填，默认挂载、不接任何 UI；增量 == 全量属性测试与逐文件 100% 覆盖通过。P5 打磨已完成：卡片标题与风险原因从中文常量改为语言无关的消息描述符（`ChainTitle` / `RiskReason`），由 `ui-agent-chain` 的 8 语言字典渲染，`--dsw-*` 令牌样式保持；三个录制用例的 golden 快照、逐变体的本地化用例、`docs/subsystems/review-chain.md` 子系统页与「两层投影」Agent Note 在同一次改动内落地。P6 已把「思考 + 行动」补成真正的子卡结构：思考卡片的 `children` 承载该步骤的工具卡片，改动卡片按 `tool/result` 的 `diffs` 渲染行级差异（投影只搬运记录文本，补丁由 UI 的 `DiffBlock` 派生）。本文其余部分保留原始规划命名（如 `trace/agent-trace`），以本行为准。
 
 ---
 
@@ -24,7 +24,7 @@
 ## 1. 结论先行
 
 1. **评审员拿到的最终产物是 diff**。所以可视化的价值不在"记录了多少"，而在回答三个问题：**它想干什么、它实际干了什么、结果可不可信**。
-2. **执行链 = 二次投影**：`SessionEvent[] → Span[]（采集层） → ChainNode[]（展示层）`。Span 保持细粒度，ChainNode 只有 6 类，专为阅读设计。
+2. **执行链 = 二次投影**：`SessionEvent[] → Span[]（采集层） → ChainNode[]（展示层）`。Span 保持细粒度，ChainNode 只有 8 类，专为阅读设计。
 3. **简易视图只管"读"**：竖向时间线、默认折叠、无图表、无数字看板；单个节点最多一行标题 + 一行对象 + 一个状态点。
 4. **指标采集不砍**：Host 侧 `agent-trace` 继续全量聚合落盘，但默认静默；未来的 `ui-trace-full` 直接读它，不需要改采集层。
 5. **最容易被误伤的一类改动要主动标出来**：改测试、改 CI/配置、删代码、超出任务范围的改动——这是评审员真正的风险点，比耗时重要得多。
@@ -60,18 +60,20 @@
 
 ## 3. 简易执行链（核心）
 
-### 3.1 节点类型（只有 6 类）
+### 3.1 节点类型（只有 8 类）
 
 | 类型 | 图标语义 | 来源（Span / 事件） | 展示内容 | 默认 |
 |---|---|---|---|---|
-| `intent` 意图 | 💭 它打算做什么 | `assistant/message` 文本首句 + `step/start` 边界；plan 变更时另起一张 | 一句话目标（≤ 60 字，可展开全文） | 展开 |
+| `prompt` 提示词 | 🙋 人要求了什么 | `user/message`（`source.kind=user`）+ 最近开启的回合 | 一句用户原话（≤ 60 字，可展开全文） | 展开 |
+| `thinking` 思考 | 💭 动手前想了什么 | 本步骤 `assistant/message` 的 reasoning 块（记在 `step` span 上） | 思考首句（≤ 60 字，可展开原文）+ 该步骤行动计数 + 行动子卡 | 展开 |
+| `intent` 意图 | 🎯 它打算做什么 | `assistant/message` 文本首句 + `step/start` 边界；plan 变更时另起一张 | 一句话目标（≤ 60 字，可展开全文） | 展开 |
 | `recon` 勘察 | 🔍 它在找什么 | `read`/`grep`/`glob`/`list`/`lsp` 工具 span | "查看了 6 个文件、搜索 3 次" + 展开列表 | 折叠 |
-| `change` 改动 | ✏️ 它改了什么 | `write`/`edit`/`str_replace` span + `fs/*` 事件 | 文件路径、修改次数、±行数、新建/删除标记 | 展开 |
+| `change` 改动 | ✏️ 它改了什么 | `write`/`edit`/`str_replace` span + `fs/*` 事件 + `tool/result` 的 `diffs` | 文件路径、修改次数、新建/删除标记、展开后是行级差异 | 展开 |
 | `verify` 验证 | ▶️ 它验证了什么 | `bash`/`test`/`build`/`workflow` span | 命令摘要、通过/失败、耗时（可选隐藏） | 展开 |
 | `interrupt` 人工 | 🙋 人介入过 | `approval/request`、`user-questions/request`、用户插话 | "因 X 请求审批，等待 42s" | 展开 |
 | `result` 结论 | ✅ 它交付了什么 | `turn/end` + 最终 assistant 文本 | 结论摘要 + 变更文件数 | 展开 |
 
-> 6 类是**展示分类**，不是新的数据源。任何字段都能回溯到原始 span → 原始 session 事件，方便"下钻"与"质疑"。
+> 8 类是**展示分类**，不是新的数据源。任何字段都能回溯到原始 span → 原始 session 事件，方便"下钻"与"质疑"。
 
 ### 3.2 折叠与合并规则（决定"简单"是否成立）
 

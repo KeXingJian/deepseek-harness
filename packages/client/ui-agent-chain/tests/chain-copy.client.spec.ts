@@ -4,16 +4,21 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag, RiskReason } from '@deepseek-ai/dsh-agent-activity'
-import type { AgentChainKey } from '../src/client/locales.ts'
-import { en } from '../src/client/locales.ts'
+import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import { en, type AgentChainKey } from '../src/client/locales.ts'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
-  cardTitle, detailRows, evidenceSpans, filterCards, isExpandable, riskReason, spanDot, statusDot,
+  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, isExpandable, riskReason,
+  spanDot, statusDot,
 } from '../src/client/chain-copy.ts'
 
+/** Shipped English copy: the namespace's own entries over the shared common vocabulary. */
+const DICTIONARY: Readonly<Record<AgentChainKey | CommonKey, string>> = { ...commonEn, ...en }
+
 /** Translate through the shipped English dictionary, interpolating its placeholders. */
-function t(key: AgentChainKey, params?: Record<string, unknown>): string {
-  return en[key].replace(/\{(\w+)\}/g, (_match, name: string) => {
+function t(key: AgentChainKey | CommonKey, params?: Record<string, unknown>): string {
+  return DICTIONARY[key].replace(/\{(\w+)\}/g, (_match, name: string) => {
     const value = params?.[name]
     return typeof value === 'string' || typeof value === 'number' ? String(value) : `{${name}}`
   })
@@ -65,11 +70,11 @@ describe('filter vocabulary', () => {
   })
 
   it('names and tones every card kind', () => {
-    const kinds = ['intent', 'recon', 'change', 'verify', 'interrupt', 'result'] as const
+    const kinds = ['prompt', 'thinking', 'intent', 'recon', 'change', 'verify', 'interrupt', 'result'] as const
     expect(kinds.map(kind => t(KIND_KEYS[kind])))
-      .toEqual(['Intent', 'Recon', 'Change', 'Verify', 'Interrupt', 'Result'])
+      .toEqual(['Prompt', 'Thinking', 'Intent', 'Recon', 'Change', 'Verify', 'Interrupt', 'Result'])
     expect(kinds.map(kind => KIND_TONES[kind]))
-      .toEqual(['info', 'quiet', 'neutral', 'outline', 'warning', 'outline'])
+      .toEqual(['quiet', 'quiet', 'info', 'quiet', 'neutral', 'outline', 'warning', 'outline'])
   })
 
   it('names and tones every risk severity', () => {
@@ -95,6 +100,16 @@ describe('spanDot', () => {
 describe('cardTitle', () => {
   it('shows a recorded intent verbatim', () => {
     expect(cardTitle(intent('inspect the catalog module'), t)).toBe('inspect the catalog module')
+  })
+
+  it('shows a recorded human prompt verbatim', () => {
+    expect(cardTitle(card({ kind: 'prompt', title: { copy: 'prompt', text: 'fix the login redirect' } }), t))
+      .toBe('fix the login redirect')
+  })
+
+  it('shows a recorded thinking line verbatim', () => {
+    expect(cardTitle(card({ kind: 'thinking', title: { copy: 'thinking', text: 'start with the router' } }), t))
+      .toBe('start with the router')
   })
 
   it('names whichever look-around totals are positive', () => {
@@ -156,6 +171,19 @@ describe('cardTitle', () => {
   })
 })
 
+describe('actionSummary', () => {
+  it('names every positive count in a fixed order', () => {
+    expect(actionSummary({ files: 2, searches: 1, changes: 3, verifications: 4 }, t))
+      .toBe('read 2 files · searched 1 times · changed 3 files · verified 4 times')
+  })
+
+  it('omits zero counts', () => {
+    expect(actionSummary({ files: 0, searches: 2, changes: 0, verifications: 1 }, t))
+      .toBe('searched 2 times · verified 1 times')
+    expect(actionSummary({ files: 0, searches: 0, changes: 0, verifications: 0 }, t)).toBe('')
+  })
+})
+
 describe('riskReason', () => {
   it('names every rule finding', () => {
     expect(riskReason(flag({ copy: 'touchesTests' }), t)).toBe('Changed test files')
@@ -190,6 +218,35 @@ describe('filterCards', () => {
   it('keeps failed and warned cards for the risks filter', () => {
     expect(filterCards(cards, 'risks').map(entry => entry.kind)).toEqual(['verify', 'interrupt'])
   })
+
+  it('promotes matching child cards to the top level', () => {
+    const nested = card({
+      kind: 'thinking',
+      title: { copy: 'thinking', text: 'change the router' },
+      children: [
+        card({ id: 'change:2', kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' } }),
+        card({ id: 'recon:3', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }),
+        card({
+          id: 'change:4',
+          kind: 'change',
+          title: { copy: 'change', op: 'update', path: 'b.ts' },
+          status: 'warning',
+        }),
+      ],
+    })
+    expect(filterCards([nested], 'changes').map(entry => entry.id)).toEqual(['change:2', 'change:4'])
+    expect(filterCards([nested], 'risks').map(entry => entry.id)).toEqual(['change:4'])
+  })
+
+  it('keeps a warned parent beside its matching child', () => {
+    const nested = card({
+      kind: 'thinking',
+      title: { copy: 'thinking', text: 'change the router' },
+      status: 'warning',
+      children: [card({ id: 'recon:2', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } })],
+    })
+    expect(filterCards([nested], 'risks').map(entry => entry.id)).toEqual(['thinking:1'])
+  })
 })
 
 describe('detailRows', () => {
@@ -207,6 +264,20 @@ describe('detailRows', () => {
       { label: 'Files', value: '2' },
       { label: 'Searches', value: '3' },
     ])
+  })
+
+  it('lists the recorded prompt and the thinking behind an intent', () => {
+    expect(detailRows(card({
+      kind: 'prompt',
+      title: { copy: 'prompt', text: 'fix the login redirect' },
+      meta: { prompt: 'fix the login redirect, and keep the tests green' },
+    }), t)).toEqual([{ label: 'Prompt text', value: 'fix the login redirect, and keep the tests green' }])
+
+    expect(detailRows(card({
+      kind: 'intent',
+      title: { copy: 'intent', text: 'check the router' },
+      meta: { thinking: 'start with the router, then the form' },
+    }), t)).toEqual([{ label: 'Thinking', value: 'start with the router, then the form' }])
   })
 
   it('shows an unrecognized operation verbatim', () => {
@@ -268,5 +339,39 @@ describe('isExpandable', () => {
 
   it('stays closed for a card with nothing behind it', () => {
     expect(isExpandable(card({ kind: 'result', title: { copy: 'result', files: 0, verifications: 0 } }), [])).toBe(false)
+  })
+
+  it('expands for a recorded diff', () => {
+    const diff = { path: 'a.ts', oldText: 'a', newText: 'b' }
+    expect(isExpandable(card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' }, diffs: [diff] }), []))
+      .toBe(true)
+  })
+})
+
+describe('recorded diffs', () => {
+  const DIFF = { path: 'src/a.ts', oldText: 'const a = 1', newText: 'const a = 2' }
+
+  it('hands a card’s recorded diffs to the diff block', () => {
+    expect(cardDiffs(card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, diffs: [DIFF] })))
+      .toEqual([DIFF])
+  })
+
+  it('reports no diffs for a card that records none', () => {
+    expect(cardDiffs(card({ kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }))).toEqual([])
+  })
+
+  it('localizes the diff card chrome from the shared vocabulary', () => {
+    const labels = diffLabels(t)
+    expect(labels).toMatchObject({
+      codeLabel: 'Code block',
+      wrapLabel: 'Wrap lines',
+      unwrapLabel: 'Do not wrap lines',
+      copy: 'Copy',
+      copied: 'Copied',
+      collapseAria: 'Collapse diff',
+      collapse: 'Collapse',
+    })
+    expect(labels.expandAria(3)).toBe('Expand 3 more diff lines')
+    expect(labels.expand(3)).toBe('… 3 more lines')
   })
 })

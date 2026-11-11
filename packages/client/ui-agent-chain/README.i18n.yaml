@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-agent-chain/README.md
 /:
-  en: 03d5de2bdfdf909f
-  zh: 5e342fe22857c013
+  en: 8bceeca3bc61911d
+  zh: 965534ec78fc32b3
 /deepseek-ai-dsh-client-ui-agent-chain:
   en: e7a2a5d5b6244663
   zh: c21ed7dd798d490d
 /deepseek-ai-dsh-client-ui-agent-chain/summary:
-  en: 521335ef89e61e7c
-  zh: 588fb52d96f9b52a
+  en: a6338ea9812a2953
+  zh: c1c955c49e1cb1b2
 /deepseek-ai-dsh-client-ui-agent-chain/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -18,20 +18,20 @@
   en: 95fa8206ccfc180a
   zh: 7c5f0aa22f026eb4
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/reading-the-chain:
-  en: 9a9b9ea6cb6447c5
-  zh: db21f05c8e07ffec
+  en: 627103b65967381d
+  zh: ca8219f1cb86e90f
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/expanding-one-card:
-  en: daa7c3a462f90211
-  zh: 5522dbc73baca4b7
+  en: f4070b923d40f17d
+  zh: 825cb1b10ba88b54
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/opening-what-a-card-names:
   en: d948aebd6e67e390
   zh: c9ac14bfc93f751a
 /deepseek-ai-dsh-client-ui-agent-chain/understand-the-implementation:
-  en: d6339c11e5c71d7c
-  zh: 103a302fa65a5b0d
+  en: 69028e5dfb2600cc
+  zh: 1144c8b9c33222c1
 /deepseek-ai-dsh-client-ui-agent-chain/further-exploration:
-  en: 7e4fd0dcd19a6140
-  zh: 3e34e9307d2dbdbb
+  en: 46ef23055130bf18
+  zh: be7755d38f4cb349
 /deepseek-ai-dsh-client-ui-agent-chain/model-experience:
   en: 98e1f1c43b404a47
   zh: d86f21d3a38db1f8
@@ -39,8 +39,8 @@
   en: 4f0eadf94828e66e
   zh: 9ab358160cac8d5e
 /deepseek-ai-dsh-client-ui-agent-chain/known-limitations-and-deferred-work:
-  en: adeff103fc173a19
-  zh: 5079a6ab3a535100
+  en: f000f04ddbed8fdd
+  zh: 6a27ffad0aea9a87
 /deepseek-ai-dsh-client-ui-agent-chain/known-limitations-and-deferred-work/dev-note:
   en: 0122e5768aba7266
   zh: 76ee5ad02be1be00

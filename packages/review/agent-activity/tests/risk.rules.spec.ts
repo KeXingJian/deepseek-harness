@@ -83,6 +83,14 @@ describe('out-of-scope', () => {
     ])
     expect(result.flags.filter(flag => flag.code === 'out-of-scope')).toEqual([])
   })
+
+  it('falls back to the recorded human prompts for the task text', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { prompt: '请修改 src/named.ts' } }),
+      tool(2, 'edit', { path: 'src/named.ts' }),
+    ])
+    expect(result.flags.filter(flag => flag.code === 'out-of-scope')).toEqual([])
+  })
 })
 
 describe('unverified', () => {

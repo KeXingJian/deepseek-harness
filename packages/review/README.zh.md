@@ -26,7 +26,7 @@ kind: "package-group"
 
 | 包 | 职责 | ctx key |
 |---|---|---|
-| [`agent-activity/`](agent-activity/README.zh.md) | 把折叠后的活动 span 投影成六类卡片执行链与评审风险标记 | —（库） |
+| [`agent-activity/`](agent-activity/README.zh.md) | 把折叠后的活动 span 投影成八类卡片执行链与评审风险标记 | —（库） |
 | [`agent-trace/`](agent-trace/README.zh.md) | 增量采集全日志活动计数，并把有界摘要持久化，供将来的评审视图读取 | `ctx.agentTrace` |
 
 <a id="related-documentation"></a>

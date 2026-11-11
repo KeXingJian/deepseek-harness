@@ -6,15 +6,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
+import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { AgentChainView, type AgentChainViewProps } from '../src/client/AgentChainView.tsx'
 import type { ChainSnapshot } from '../src/client/chain-view.ts'
 import { en, type AgentChainKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
+/** Shipped English copy: the namespace's own entries over the shared common vocabulary. */
+const DICTIONARY: Readonly<Record<AgentChainKey | CommonKey, string>> = { ...commonEn, ...en }
+
 /** Translate through the shipped English dictionary, interpolating its placeholders. */
-function t(key: AgentChainKey, params?: Record<string, unknown>): string {
-  return en[key].replace(/\{(\w+)\}/g, (_match, name: string) => {
+function t(key: AgentChainKey | CommonKey, params?: Record<string, unknown>): string {
+  return DICTIONARY[key].replace(/\{(\w+)\}/g, (_match, name: string) => {
     const value = params?.[name]
     return typeof value === 'string' || typeof value === 'number' ? String(value) : `{${name}}`
   })
@@ -136,6 +141,79 @@ describe('card disclosure', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide evidence' }))
     expect(screen.queryByText('src/a.ts')).toBeNull()
     expect(screen.getByRole('button', { name: 'Show evidence' })).toBeTruthy()
+  })
+
+  it('shows a thinking card with its step actions and reveals the recorded text', () => {
+    renderView([
+      card({
+        kind: 'prompt',
+        title: { copy: 'prompt', text: 'fix the login redirect' },
+        meta: { prompt: 'fix the login redirect and keep the tests green' },
+      }),
+      card({
+        kind: 'thinking',
+        title: { copy: 'thinking', text: 'start with the router' },
+        meta: { thinking: 'start with the router, then the form' },
+        actions: { files: 1, searches: 0, changes: 1, verifications: 0 },
+      }),
+    ])
+    expect(screen.getByText('read 1 files · changed 1 files')).toBeTruthy()
+    for (const toggle of screen.getAllByRole('button', { name: 'Show evidence' })) fireEvent.click(toggle)
+    expect(screen.getByText('Prompt text')).toBeTruthy()
+    expect(screen.getByText('fix the login redirect and keep the tests green')).toBeTruthy()
+    expect(screen.getAllByText('Thinking')).toHaveLength(2)
+    expect(screen.getByText('start with the router, then the form')).toBeTruthy()
+  })
+})
+
+describe('nested action cards', () => {
+  const diff = { path: 'src/a.ts', oldText: 'const a = 1', newText: 'const a = 2' }
+
+  /** One thinking card whose step changed one file and read another. */
+  function thinkingWithChildren(): ChainCard {
+    return card({
+      id: 'thinking:2',
+      kind: 'thinking',
+      title: { copy: 'thinking', text: 'start with the router' },
+      meta: { thinking: 'start with the router, then the form' },
+      actions: { files: 1, searches: 0, changes: 1, verifications: 0 },
+      children: [
+        card({
+          id: 'change:3',
+          kind: 'change',
+          title: { copy: 'change', op: 'update', path: 'src/a.ts' },
+          meta: { path: 'src/a.ts', op: 'update' },
+          diffs: [diff],
+        }),
+        card({ id: 'recon:4', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 }, meta: { files: 1 } }),
+      ],
+    })
+  }
+
+  it('renders the step actions as child cards without expanding the parent', () => {
+    renderView([thinkingWithChildren()])
+    expect(screen.getByText('src/a.ts modified')).toBeTruthy()
+    expect(screen.getByText('1 files')).toBeTruthy()
+    expect(screen.getByText('start with the router')).toBeTruthy()
+  })
+
+  it('expands a child card on its own', () => {
+    renderView([thinkingWithChildren()])
+    // Parent, change child, and recon child each own a toggle.
+    const toggles = screen.getAllByRole('button', { name: 'Show evidence' })
+    expect(toggles).toHaveLength(3)
+    fireEvent.click(toggles[1] as HTMLElement)
+    expect(screen.getByText('const a = 1')).toBeTruthy()
+    expect(screen.getByText('const a = 2')).toBeTruthy()
+    expect(screen.queryByText('start with the router, then the form')).toBeNull()
+  })
+
+  it('shows a recorded diff on a change card that records nothing else', () => {
+    renderView([card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, diffs: [diff] })])
+    fireEvent.click(screen.getByRole('button', { name: 'Show evidence' }))
+    expect(screen.getByText('const a = 1')).toBeTruthy()
+    expect(screen.getByText('const a = 2')).toBeTruthy()
+    expect(document.querySelector('[data-diff]')).toBeTruthy()
   })
 })
 

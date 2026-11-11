@@ -1,5 +1,5 @@
 ---
-description: "Review-chain conversation view for the Web GUI: filters, per-card disclosure, and review risk flags over the six-card execution chain projection."
+description: "Review-chain conversation view for the Web GUI: filters, per-card disclosure, and review risk flags over the eight-card execution chain projection."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The review-chain view turns one Session's agent activity into a short, readable execution chain inside the conversation view. It registers the `Chain` conversation view tab (`执行链` in Chinese), renders the six card kinds the `dsh-agent-activity` projection produces, filters them, expands one card's recorded facts and evidence, and shows the review risk flags above the list. A recorded path opens the file in the Sidebar preview, and an evidence row opens its tool call in Trajectory. The plugin runs in the browser only; the Node half is an empty `apply` that keeps the package a Loader row.
+The review-chain view turns one Session's agent activity into a short, readable execution chain inside the conversation view. It registers the `Chain` conversation view tab (`执行链` in Chinese), renders the eight card kinds the `dsh-agent-activity` projection produces, filters them, expands one card's recorded facts and evidence, and shows the review risk flags above the list. A recorded path opens the file in the Sidebar preview, and an evidence row opens its tool call in Trajectory. The plugin runs in the browser only; the Node half is an empty `apply` that keeps the package a Loader row.
 
 ## Table of Contents
 
@@ -29,13 +29,13 @@ Mount the plugin beside `ui-conversation`, `ui-renderer`, and `ui-primitives`; i
 
 ### Reading the chain
 
-Each row shows a status dot, the card kind, one title line, and — when the projection merged repeated work — a repeat count. The card kinds are `intent`, `recon`, `change`, `verify`, `interrupt`, and `result`. The projection supplies each title as a message descriptor and keeps failures on their own cards; this package's dictionary owns the wording, and `chain-copy.ts` resolves it.
+Each row shows a status dot, the card kind, one title line, and — when the projection merged repeated work — a repeat count. The card kinds are `prompt`, `thinking`, `intent`, `recon`, `change`, `verify`, `interrupt`, and `result`. A thinking card adds a second line with its step's action counts, composed in the reader's language, and owns that step's action cards as children: they render indented under it, each with its own disclosure, so one row reads "thought this, then did that" without leaving the step. The projection supplies each title as a message descriptor and keeps failures on their own cards; this package's dictionary owns the wording, and `chain-copy.ts` resolves it.
 
-Three filters narrow the list: `All`, `Changes only`, and `Risks only`. `Risks only` keeps failed and warned cards, not the risk banner, which stays visible whenever the projection reports flags. A filter that matches nothing shows its own empty line rather than the waiting state.
+Three filters narrow the list: `All`, `Changes only`, and `Risks only`. `Risks only` keeps failed and warned cards, not the risk banner, which stays visible whenever the projection reports flags. A matching card nested under a thinking card is promoted to the top level, so a filter never loses a change or a risk behind its parent. A filter that matches nothing shows its own empty line rather than the waiting state.
 
 ### Expanding one card
 
-The disclosure button reveals what the card recorded: its named facts (path, command, tool, operation, file count, search count) and one row per contributing span with its session-log sequence, span name, and settlement. Cards without recorded facts or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
+The disclosure button reveals what the card recorded: its named facts (the human prompt text, the step's thinking, path, command, tool, operation, file count, search count) and one row per contributing span with its session-log sequence, span name, and settlement. A change card whose tool recorded the changed text shows a line diff first — the file's before and after lines, capped, with the card's own expand control — so the reviewer reads the edit instead of a description of it. Cards without recorded facts, diffs, or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
 
 ### Opening what a card names
 
@@ -46,7 +46,7 @@ A path fact and a risk flag's files are buttons: each opens that file in the Sid
 
 The plugin contributes four things in `apply`: the `agentChain` dictionary, one Conversation Definition, one Conversation view target, and one `conversation.view` slot entry.
 
-- `chainDefinition` matches the seven durable event types the chain reads and folds them through `@deepseek-ai/dsh-agent-activity`. Every matched event is offered as a start candidate: the engine starts the Context from the earliest retained event of the loaded history window and applies the rest as updates, which also re-derives the chain when the window slides. The built node carries the folded chain and the spans it was folded from, so expansion can read one span by sequence.
+- `chainDefinition` matches the eight durable event types the chain reads and folds them through `@deepseek-ai/dsh-agent-activity`. It also records the `diffs` payload of each `tool/result` under its call id, because a span keeps the call identity but not the file text; the view node passes that record to `chainFromSpans` as its third argument. Nothing extra is stored: the text stays in the tool result the log already holds. Every matched event is offered as a start candidate: the engine starts the Context from the earliest retained event of the loaded history window and applies the rest as updates, which also re-derives the chain when the window slides. The built node carries the folded chain and the spans it was folded from, so expansion can read one span by sequence.
 - `chainViewDefinition` publishes one snapshot per Session — `{ cards, flags, spans }` — from the node the Definition builds. The node reuses the engine-owned Context key; a hand-written key fails the engine's identity check.
 - `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. `chain-copy.ts` holds the filter, kind, and severity vocabulary, resolves a card title and a risk reason through the dictionary, and derives the expansion and evidence rows, so the component keeps no copy and no service access. The view receives `inspectCall` from the conversation view owner share and calls it with a span's recorded call identity.
 - The slot's `inject` face resolves a card's path against the Session's workspace root — read from `sessions.list` at click time — and opens it through `sidebarRight.openResource` as a Session-scoped file address; the file preview owns reading the content.
@@ -57,7 +57,7 @@ The plugin contributes four things in `apply`: the `agentChain` dictionary, one 
 
 - [Conversation view reference](../../../docs/subsystems/conversation.md) — Definitions, view targets, and the slot that hosts a view.
 - [Review activity chain](../../../docs/subsystems/review-chain.md) — the span and card types this view renders and the messages its dictionary resolves.
-- [`dsh-agent-activity`](../../review/agent-activity/README.md) — the span fold, the six card kinds, and the risk rules this view renders.
+- [`dsh-agent-activity`](../../review/agent-activity/README.md) — the span fold, the eight card kinds, and the risk rules this view renders.
 - [`dsh-client-ui-primitives`](../ui-primitives/README.md) — `Pill`, `Tag`, and `StateDot`, the controls this view composes.
 
 <a id="model-experience"></a>
@@ -74,6 +74,8 @@ None.
 - **Counts interpolate without plural forms** — a dictionary message receives the number and renders one template, so an English chain reads "1 searches" rather than a singular form.
 - **No folding of the chain itself** — every card renders; there is no "collapse all" or per-kind grouping yet.
 - **Turn and step evidence does not navigate** — only a tool-call span carries the call identity Trajectory can focus, so a turn or step row stays a label.
+- **Diffs only cover recorded text** — a change whose tool result carries no `diffs` (a shell deletion, a tool that reports only the operation) shows its path and operation without a diff; the view never reads the file to reconstruct one.
+- **Child cards belong to their step** — a change on the same file in two steps stays two cards under two thinking cards, because the card belongs to the reasoning that caused it.
 
 ### Dev Note
 

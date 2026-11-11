@@ -1,18 +1,23 @@
 /**
  * 评审链视图：风险横幅、三个卡片筛选器，以及评审者无需打开转录即可浏览的
- * 可读卡片列表。展开后会显示折叠出该卡片的文件和原始 span。
+ * 可读卡片列表。思考卡片带着它触发的行动子卡，展开后会显示折叠出该卡片的
+ * 文件和原始 span。
  */
 
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
-import { IconChevronDownOutlineRegular, Pill, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
+import { DiffBlock, IconChevronDownOutlineRegular, Pill, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChainSnapshot } from './chain-view.ts'
 import type { ChainEvidenceSpan, ChainFilter, ChainTranslate } from './chain-copy.ts'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
-  cardTitle, detailRows, evidenceSpans, filterCards, isExpandable, riskReason, statusDot,
+  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, isExpandable, riskReason,
+  statusDot,
 } from './chain-copy.ts'
 import css from './AgentChainView.module.css'
+
+/** 展开的改动卡片先显示的行数；其余行由卡片自身的折叠控件展开。 */
+const DIFF_MAX_LINES = 12
 
 /** 由会话视图 slot 绑定的 props。 */
 export interface AgentChainViewProps {
@@ -76,18 +81,21 @@ function EvidenceRow({ span, inspectCall, t }: {
   )
 }
 
-/** 一行卡片，拥有自己的展开状态。 */
-function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }: {
+/** 一行卡片，拥有自己的展开状态；思考卡片的行动子卡在此递归渲染。 */
+function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, t }: {
   card: ChainCard
   spans: ChainSnapshot['spans']
-  open: boolean
-  onToggle: () => void
+  expanded: readonly string[]
+  onToggle: (id: string) => void
   openFile: AgentChainViewProps['openFile']
   inspectCall: AgentChainViewProps['inspectCall']
   t: AgentChainViewProps['t']
 }) {
   const rows = detailRows(card, t)
+  const diffs = cardDiffs(card)
   const expandable = isExpandable(card, rows)
+  const open = expanded.includes(card.id)
+  const labels = useMemo(() => diffLabels(t), [t])
   // 折叠的卡片保持低开销：只有展开的卡片才会执行 span 查找。
   const evidence = open ? evidenceSpans(card, spans) : []
   return (
@@ -103,14 +111,20 @@ function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }:
             className={css.toggle}
             aria-expanded={open}
             aria-label={t(open ? 'card.collapse' : 'card.expand')}
-            onClick={onToggle}
+            onClick={() => { onToggle(card.id) }}
           >
             <IconChevronDownOutlineRegular size={12} className={open ? `${css.chevron} ${css.chevronOpen}` : css.chevron} />
           </button>
         )}
       </div>
+      {card.actions !== undefined && (
+        <div className={css.actions}>{actionSummary(card.actions, t)}</div>
+      )}
       {open && expandable && (
         <div className={css.detail}>
+          {diffs.length > 0 && (
+            <DiffBlock diffs={diffs} labels={labels} maxLines={DIFF_MAX_LINES} className={css.diffBody} />
+          )}
           {rows.length > 0 && (
             <dl className={css.meta}>
               {rows.map(row => (
@@ -136,6 +150,22 @@ function ChainCardRow({ card, spans, open, onToggle, openFile, inspectCall, t }:
             </div>
           )}
         </div>
+      )}
+      {card.children !== undefined && (
+        <ol className={css.children}>
+          {card.children.map(child => (
+            <ChainCardRow
+              key={child.id}
+              card={child}
+              spans={spans}
+              expanded={expanded}
+              onToggle={onToggle}
+              openFile={openFile}
+              inspectCall={inspectCall}
+              t={t}
+            />
+          ))}
+        </ol>
       )}
     </li>
   )
@@ -195,8 +225,8 @@ export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChai
                 key={card.id}
                 card={card}
                 spans={chain.spans}
-                open={expanded.includes(card.id)}
-                onToggle={() => { toggle(card.id) }}
+                expanded={expanded}
+                onToggle={toggle}
                 openFile={openFile}
                 inspectCall={inspectCall}
                 t={t}

@@ -10,14 +10,14 @@
 ```mermaid
 flowchart TB
     subgraph LOG["Session 日志（唯一事实来源）"]
-        E["turn/start · step/start · assistant/message<br/>tool/call · tool/result · step/end · turn/end"]
+        E["turn/start · step/start · user/message · assistant/message<br/>tool/call · tool/result · step/end · turn/end"]
     end
 
     E -->|"每提交一个事件调用一次"| FOLD["applyActivityEvent<br/>增量折叠"]
     FOLD --> SPANS["ActivitySpan[]<br/>turn / step / tool"]
 
     SPANS --> CHAIN["chainFromSpans<br/>六步变换"]
-    CHAIN --> CARDS["ChainCard[]<br/>intent / recon / change / verify / interrupt / result"]
+    CHAIN --> CARDS["ChainCard[]<br/>prompt / thinking / intent / recon / change / verify / interrupt / result"]
     CHAIN --> FLAGS["RiskFlag[]<br/>7 条评审风险规则"]
     CARDS --> UI["ui-agent-chain<br/>浏览器会话视图"]
     FLAGS --> UI
@@ -53,6 +53,8 @@ flowchart LR
 
     subgraph ATTRIBUTE["附着属性"]
         T7["assistant/message"] --> S7["首个非空文本块 → turn 跨度的 intent<br/>已有 intent 则不再覆盖"]
+        T9["user/message 且 source.kind=user<br/>（最近开启的回合）"] --> S10["首个人类提示词 → turn 跨度的 prompt<br/>同时记录该事件的 promptSeq"]
+        T11["assistant/message 的 reasoning 块"] --> S12["累加到该回合当前步骤 → step 跨度的 thinking<br/>首次贡献的序号记为 thinkingSeq，截断到 2000 字符"]
         T8["tool/call 参数解析"] --> S8["抽取 path / file / command / pattern / op"]
         S8 --> S9["bash 且命令以 rm 开头<br/>→ op=delete, path=删除目标"]
     end
@@ -62,6 +64,7 @@ flowchart LR
 
 - **非破坏性更新**：函数永不修改入参，未改变的状態返回同一引用（上层可直接用引用比较短路重渲染）。
 - **迟到事件不补**：`turn/end`、`step/end`、`tool/result` 找不到对应的开启记录时直接返回原状态，不凭空造跨度。
+- **提示词挂在回合、思考挂在步骤**：`user/message` 不携带回合编号，因此记到最近开启的回合；合成注入（插件上下文、召回历史、目标续跑）不是人类提示词，不记录。思考记到 `assistant/message` 自带的 turn/step；步骤未开启时丢弃。同一事件同时推进回合的 `intent` 与步骤的 `thinking`。
 - **只有三类跨度会产出**：`request`、`subagent`、`workflow`、`compaction` 在类型里存在，当前 folder 从不产出，计数恒为 0。
 - **`seq` 是跨度身份**：每个跨度记录它开启时的会话事件序号，是后续"证据回溯"的锚点。
 
@@ -71,7 +74,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["1. baseCard<br/>逐跨度出卡"] --> B["2. mergeRecon<br/>相邻探查合并计数"]
+    A["1. baseCards<br/>逐跨度出卡"] --> B["2. mergeRecon<br/>相邻探查合并计数"]
     B --> C["3. mergeChanges<br/>同文件变更合并 repeat++"]
     C --> D["4. foldVerifies<br/>连续 ≥3 次成功校验折叠"]
     D --> E["5. dedupeIntents<br/>相似度 ≥0.8 去重"]
@@ -86,9 +89,15 @@ flowchart LR
 ```mermaid
 flowchart TD
     S["一个 ActivitySpan"] --> K{"跨度类别"}
-    K -->|turn| I{"有 intent 属性?"}
+    K -->|turn| P{"有 prompt 属性?"}
+    P -->|是| PC["prompt 卡片<br/>依据 promptSeq"]
+    P -->|否| I{"有 intent 属性?"}
+    PC --> I
     I -->|是| IC["intent 卡片"]
     I -->|否| DROP["不出卡"]
+    K -->|step| TH{"有 thinking 属性?"}
+    TH -->|是| TC["thinking 卡片<br/>依据 thinkingSeq<br/>actions=同步骤工具计数<br/>children=同步骤工具卡片"]
+    TH -->|否| DROP
     K -->|subagent| SB["recon 卡片<br/>标题区分成功/失败"]
     K -->|workflow| WF["verify 卡片<br/>阶段完成/失败"]
     K -->|tool| TI{"工具属于哪一类"}
@@ -114,11 +123,17 @@ flowchart TD
 | `resultCard` | 汇总变更文件数、校验次数；有改动但无成功校验时状态为 error | 给整条链一个结论 |
 | `capCards` | 超过 30 张时，反复合并最前面的两张探查卡片 | 只压探查，因为压掉不同文件的变更会藏住必须看的东西 |
 
+> 合并按层进行：顶层卡片合成一层，每张思考卡片的 `children` 再各自合成一层。思考卡片不参与任何合并，并且会把相邻勘察卡隔开：每个步骤的行动子卡各自成层，这正是"思考 + 行动"要表达的配对关系；同一文件在两个步骤里各改一次就是两张子卡，因为卡片属于促成它的那段思考。
+
 ### 2.3 卡片契约
 
-- **标题是消息描述符，不是文案**：除 `intent` 是模型原话（截断到 60 字符）外，其余只描述"用哪条文案 + 插值什么值"，具体语言由 UI 查自己的字典 → 投影层永不产生产品文案。
-- **`evidenceSeqs`**：每张卡片记录它由哪些会话事件序号构成，评审者可以点开回原始事件。
-- **`meta`**：同一事实的机器可读副本，供展开视图与风险规则使用。
+- **标题是消息描述符，不是文案**：`prompt` 是用户原话、`thinking` 是模型思考首句、`intent` 是模型原话（都截断到 60 字符），其余只描述"用哪条文案 + 插值什么值"，具体语言由 UI 查自己的字典 → 投影层永不产生产品文案。
+- **`evidenceSeqs`**：每张卡片记录它由哪些会话事件序号构成，评审者可以点开回原始事件；`prompt` 卡片依据写下它的那条 `user/message`，`thinking` 卡片依据它展示思考的那条 `assistant/message`。
+- **`actions`**：思考卡片用 `ChainActions`（files / searches / changes / verifications 计数）描述同一步骤触发的行动，供 UI 组合成一行摘要。
+- **`children`**：同一步骤的工具调用成为该思考卡片的子卡，按事件顺序排列并以缩进子卡渲染；没有记录思考的步骤，工具卡片留在顶层平铺。结果卡与风险规则统计的是展开后的全部卡片，因此子卡里的改动同样计入文件数与风险标记。
+- **`diffs`**：改动卡片可携带 `ChainDiff`（path / oldText / newText，记录时变更前后的原文），由 `chainFromSpans(spans, userText?, diffs?)` 的第三项按工具调用标识传入——跨度只记录调用标识，不记录它改过的文件文本。投影只挂载、不计算补丁；同一文件的多次改动合并时差异块按顺序拼接，行级补丁由 UI 的 `DiffBlock` 派生。
+- **`meta`**：同一事实的机器可读副本，供展开视图与风险规则使用；用户提示词全文放在 `prompt` 卡片的 `meta.prompt`，步骤的思考原文放在 `thinking` 卡片的 `meta.thinking`。
+- **提示词、思考与意图都不参与合并**：`prompt` 卡片按回合出现一次，`thinking` 卡片按步骤出现一次，`dedupeIntents` 只合并相似意图——每句人类要求和每步思考都是独立事实。
 
 ---
 
@@ -304,6 +319,7 @@ sequenceDiagram
 | 卡片链在浏览器折叠 | 宿主侧的 `agent-trace` 计数暂时"存而不用" |
 | `agent-trace` 无消费者 | 完整 trace 视图尚未实现，`sessionSummary` / `sessionTrace` 无人调用 |
 | 只折叠 turn / step / tool | `request`、`subagent`、`workflow`、`compaction` 计数恒为 0 |
+| 提示词挂在回合、思考挂在步骤 | 不新增跨度类别，计数与摘要格式不变；冷读日志同样能折出它们 |
 | 从日志折出来的链不含审批、子代理交接、工作流阶段 | 这些是活 Cordis 事件，不是 Session 记录 |
 | 冷 trace 每次重读日志 | 存储只留摘要，不留跨度 |
-| `out-of-scope` 是启发式 | 与"读过的路径"和用户任务文本比对，属于推断而非事实 |
+| `out-of-scope` 是启发式 | 与"读过的路径"和任务文本（调用方传入，或链中记录的提示词）比对，属于推断而非事实 |

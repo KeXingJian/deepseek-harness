@@ -27,12 +27,16 @@ interface ActivitySpan {
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
   /**
    * 采集层附加到该跨度上的展示信息：模型给出的工具参数（目标文件统一记为
-   * `path`）、文件变更工具上报或 bash 删除派生的 `op`、回合的单行 `intent`，
-   * 以及在检查视图中定位某次工具调用的已记录 `callId`。
+   * `path`）、文件变更工具上报或 bash 删除派生的 `op`、回合的单行 `intent`、
+   * 该回合的人类提示词 `prompt` 及其事件序号 `promptSeq`、步骤内助手的思考原文
+   * `thinking` 及其事件序号 `thinkingSeq`，以及在检查视图中定位某次工具调用的
+   * 已记录 `callId`。
    */
   readonly attributes?: Readonly<Record<string, string | number | boolean>> | undefined
 }
 ```
+
+回合 span 记录人要求了什么：回合内第一条人类 `user/message` 贡献 `prompt` 与 `promptSeq`；插件上下文、召回历史、目标续跑等合成 `user/message` 注入不是人类提示词。步骤 span 记录模型动手之前想了什么：步骤内每条 `assistant/message` 把它的思考块累加进 `thinking`，并记录第一条的序号 `thinkingSeq`，有长度上限，保证展开的卡片仍然可读。
 
 `ActivitySummary` 为那些永远不展开 span 列表的视图统计同一批 span。一次折叠通过与 span 列表相同的开启/结算转移推进它，因此增量构造出的摘要与对最终列表调用 `summarizeSpans()` 的结果始终一致。
 
@@ -55,8 +59,8 @@ interface ActivitySummary {
 卡片按固定顺序回答评审者的问题；风险标记在卡片之后计算，因此被标记的改动会显示为 warning，而不会改动它来自的 span。`evidenceSeqs` 让每张卡都可核对：不信任某张卡的读者可以打开它依据的序号。
 
 ```ts type-equiv
-/** 评审者可见的六种卡片类别。 */
-type ChainKind = 'intent' | 'recon' | 'change' | 'verify' | 'interrupt' | 'result'
+/** 评审者可见的八种卡片类别。 */
+type ChainKind = 'prompt' | 'thinking' | 'intent' | 'recon' | 'change' | 'verify' | 'interrupt' | 'result'
 ```
 
 ```ts type-equiv
@@ -69,7 +73,9 @@ type ChainStatus = 'ok' | 'error' | 'running' | 'warning'
 type ChangeOp = 'create' | 'update' | 'delete'
 ```
 
-卡片标题是消息描述符而不是文本：投影说明适用哪条消息以及要插值的值，呈现层再通过读者的语言字典解析该变体。`intent` 是例外——它就是模型自己写的那句话，原样显示。
+卡片标题是消息描述符而不是文本：投影说明适用哪条消息以及要插值的值，呈现层再通过读者的语言字典解析该变体。`prompt`、`thinking` 与 `intent` 是例外——它们是人写的话和模型自己写的话，原样显示。`prompt` 卡片依据写下它的那条 `user/message`，`thinking` 卡片依据它展示其思考的那条 `assistant/message`。
+
+记录了思考的步骤出一张 `thinking` 卡片，该步骤的工具调用成为它的 `children`：以子卡形式挂在它下面，读者先看到"想了什么"、再看到"做了什么"，而每个文件目标与风险标记都保留在自己的卡片上。思考卡片用 `actions` 给出该步骤的行动计数（消息描述符，由呈现层按读者语言组合），并把思考原文放进 `meta`。没有记录思考的步骤，工具卡片留在链上平铺；没有工具调用的步骤，出的思考卡不带行动摘要。
 
 ```ts type-equiv
 /**
@@ -77,6 +83,10 @@ type ChangeOp = 'create' | 'update' | 'delete'
  * 原样；其他每种变体只指明一条由读者所在语言字典提供的消息。
  */
 type ChainTitle =
+  /** 用户原话，按记录截断后展示。 */
+  | { readonly copy: 'prompt'; readonly text: string }
+  /** 助手在该步骤的思考首句，按记录原样展示。 */
+  | { readonly copy: 'thinking'; readonly text: string }
   /** 回合自身的意图语句，按记录原样展示。 */
   | { readonly copy: 'intent'; readonly text: string }
   /** 被合并为计数总计的探查类工作。 */
@@ -104,6 +114,24 @@ type ChainTitle =
 ```
 
 ```ts type-equiv
+/**
+ * 一张思考卡片所属步骤触发的行动计数。
+ *
+ * 展示层用读者语言把这些计数组合成一行摘要，因此投影只给出数字，不写句子。
+ */
+interface ChainActions {
+  /** 该步骤打开过的文件数。 */
+  readonly files: number
+  /** 该步骤执行的检索次数。 */
+  readonly searches: number
+  /** 该步骤造成的文件变更数。 */
+  readonly changes: number
+  /** 该步骤执行的校验次数。 */
+  readonly verifications: number
+}
+```
+
+```ts type-equiv
 /** 执行链中一个可读的步骤。 */
 interface ChainCard {
   /** 由类别与首个贡献序号推导出的稳定标识符。 */
@@ -120,12 +148,41 @@ interface ChainCard {
   readonly evidenceSeqs: readonly number[]
   /** 合并后的出现次数，用于同一目标上的重复工作。 */
   readonly repeat?: number | undefined
+  /** 思考卡片所在步骤触发的行动计数，供展示层组合成一行摘要。 */
+  readonly actions?: ChainActions | undefined
+  /**
+   * 思考卡片所在步骤触发的行动卡片，按事件顺序排列。
+   *
+   * 行动是这段思考的直接结果，因此随思考卡片一起展示；只有思考卡片拥有子卡，
+   * 其余卡片的行动在链上平铺。
+   */
+  readonly children?: readonly ChainCard[] | undefined
+  /** 改动卡片记录的差异块，供展示层渲染该次改动；没有记录时不存在。 */
+  readonly diffs?: readonly ChainDiff[] | undefined
   /** 展示层无需解析标题即可读取的机器可读信息。 */
   readonly meta?: Readonly<Record<string, string | number>> | undefined
 }
 ```
 
-`meta` 以机器可读形式携带同一批记录事实——目标路径、命令、工具名、操作和合并后的计数。展开的卡片用本地化字段名列出它们，风险规则也读取它们而不是解析标题。
+`meta` 以机器可读形式携带同一批记录事实——目标路径、命令、工具名、操作、合并后的计数，以及记录下来的提示词与思考原文。展开的卡片用本地化字段名列出它们，风险规则也读取它们而不是解析标题。
+
+```ts type-equiv
+/**
+ * 一张改动卡片展示的差异块：记录时变更前后的原文。
+ *
+ * 投影只搬运记录的文本，不计算行级补丁；补丁由展示层从这两段文本派生。
+ */
+interface ChainDiff {
+  /** 该差异所属的文件路径。 */
+  readonly path: string
+  /** 变更前的原文（含上下文）；没有旧内容时为 null。 */
+  readonly oldText: string | null
+  /** 变更后的原文（含上下文）。 */
+  readonly newText: string
+}
+```
+
+`change` 卡片可以携带 `diffs`：该文件记录下来的变更前后原文，每个应用后的差异块一条。投影只挂上调用方记录的内容，不计算补丁；同一文件的两次改动合并时，差异块按顺序拼接。`chainFromSpans(spans, userText?, diffs?)` 的第三项按工具调用标识索引差异块，因为跨度只记录调用标识，并不记录它改过的文件文本。
 
 ```ts type-equiv
 /** 评审风险标记的严重程度。 */

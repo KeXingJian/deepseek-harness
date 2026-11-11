@@ -4,9 +4,11 @@
  */
 
 import type {
-  ActivitySpan, ChangeOp, ChainCard, ChainKind, ChainStatus, ChainTitle, RiskFlag, RiskReason, RiskSeverity,
+  ActivitySpan, ChangeOp, ChainActions, ChainCard, ChainKind, ChainStatus, ChainTitle, RiskFlag, RiskReason,
+  RiskSeverity,
 } from '@deepseek-ai/dsh-agent-activity'
-import type { StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
+import type { DiffBlockLabels, DiffHunk, StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { AgentChainKey } from './locales.ts'
 
@@ -25,6 +27,8 @@ export const FILTER_KEYS: Readonly<Record<ChainFilter, AgentChainKey>> = {
 
 /** 命名一种卡片类型的词典键。 */
 export const KIND_KEYS: Readonly<Record<ChainKind, AgentChainKey>> = {
+  prompt: 'kind.prompt',
+  thinking: 'kind.thinking',
   intent: 'kind.intent',
   recon: 'kind.recon',
   change: 'kind.change',
@@ -35,6 +39,8 @@ export const KIND_KEYS: Readonly<Record<ChainKind, AgentChainKey>> = {
 
 /** 一种卡片类型的标签配色；失败和警告仍由状态圆点表示。 */
 export const KIND_TONES: Readonly<Record<ChainKind, TagTone>> = {
+  prompt: 'quiet',
+  thinking: 'quiet',
   intent: 'info',
   recon: 'quiet',
   change: 'neutral',
@@ -86,8 +92,38 @@ export interface ChainEvidenceSpan {
   readonly callId?: string | undefined
 }
 
-/** 翻译一个评审链键，并插值消息中声明的占位符。 */
-export type ChainTranslate = (key: AgentChainKey, params?: Record<string, unknown>) => string
+/** 翻译一个评审链键或共享通用词条，并插值消息中声明的占位符。 */
+export type ChainTranslate = (key: AgentChainKey | CommonKey, params?: Record<string, unknown>) => string
+
+/**
+ * 组合一张卡片记录的差异块，供 `DiffBlock` 渲染。
+ * @param card - 链上的卡片。
+ * @returns 差异块；卡片没有记录差异时为空数组。
+ */
+export function cardDiffs(card: ChainCard): DiffHunk[] {
+  return card.diffs === undefined ? [] : [...card.diffs]
+}
+
+/**
+ * 组合差异卡片的界面文案。
+ *
+ * 复制、换行与折叠用共享通用词汇，只有差异行数相关的三条走本命名空间词典。
+ * @param t - 评审链翻译器。
+ * @returns 代码工具栏、复制与折叠文案。
+ */
+export function diffLabels(t: ChainTranslate): DiffBlockLabels {
+  return {
+    codeLabel: t('codeBlock.title'),
+    wrapLabel: t('codeBlock.wrap'),
+    unwrapLabel: t('codeBlock.unwrap'),
+    copy: t('copy'),
+    copied: t('copied'),
+    collapseAria: t('diff.collapseAria'),
+    expandAria: count => t('diff.expandAria', { count }),
+    collapse: t('collapse'),
+    expand: count => t('diff.expandRest', { count }),
+  }
+}
 
 /** 命名一种文件操作卡片标题的词典键。 */
 const CHANGE_TITLE_KEYS: Readonly<Record<ChangeOp, AgentChainKey>> = {
@@ -114,15 +150,32 @@ function reconText(files: number, searches: number, t: ChainTranslate): string {
  * 用读者的语言组合单张卡片的标题。
  * @param card - 要渲染的卡片。
  * @param t - 评审链翻译器。
- * @returns 标题文本；intent 卡片会原样返回模型自己的措辞。
+ * @returns 标题文本；prompt、thinking 与 intent 卡片会原样返回记录下来的措辞。
  */
 export function cardTitle(card: ChainCard, t: ChainTranslate): string {
   return titleText(card.title, t)
 }
 
+/**
+ * 用读者的语言组合一张思考卡片的行动摘要。
+ * @param actions - 投影记录的该步骤行动计数。
+ * @param t - 评审链翻译器。
+ * @returns 只包含正数计数的一行摘要，各部分以中点分隔。
+ */
+export function actionSummary(actions: ChainActions, t: ChainTranslate): string {
+  const parts: string[] = []
+  if (actions.files > 0) parts.push(t('actions.files', { count: actions.files }))
+  if (actions.searches > 0) parts.push(t('actions.searches', { count: actions.searches }))
+  if (actions.changes > 0) parts.push(t('actions.changes', { count: actions.changes }))
+  if (actions.verifications > 0) parts.push(t('actions.verifications', { count: actions.verifications }))
+  return parts.join(' · ')
+}
+
 /** 组合一条消息描述符的标题。 */
 function titleText(title: ChainTitle, t: ChainTranslate): string {
   switch (title.copy) {
+    case 'prompt':
+    case 'thinking':
     case 'intent':
       return title.text
     case 'recon':
@@ -206,6 +259,9 @@ export function statusDot(state: ChainStatus | undefined): StateDotState {
 
 /**
  * 保留某个筛选器允许的卡片。
+ *
+ * 行动子卡也能被筛选：命中的子卡提升到顶层单独成行，否则改动或风险会随
+ * 思考卡片一起被筛掉。
  * @param cards - 按展示顺序排列的链卡片。
  * @param filter - 选中的筛选器。
  * @returns 匹配的卡片；`all` 会保持输入数组不变。
@@ -213,9 +269,14 @@ export function statusDot(state: ChainStatus | undefined): StateDotState {
 export function filterCards(cards: readonly ChainCard[], filter: ChainFilter): readonly ChainCard[] {
   switch (filter) {
     case 'changes':
-      return cards.filter(card => card.kind === 'change')
+      return cards.flatMap(card => card.kind === 'change'
+        ? [card]
+        : filterCards(card.children ?? [], filter))
     case 'risks':
-      return cards.filter(card => card.status === 'error' || card.status === 'warning')
+      return cards.flatMap((card) => {
+        const matched = card.status === 'error' || card.status === 'warning' ? [card] : []
+        return [...matched, ...filterCards(card.children ?? [], filter)]
+      })
     default:
       return cards
   }
@@ -264,14 +325,18 @@ function metaCount(meta: ChainCard['meta'], key: string): string | undefined {
 /**
  * 构建一张展开的卡片所显示的带标签事实。
  *
- * `path`、`command` 和 `tool` 对某些类型来说重复了标题中已有的内容，但读者展开
- * 卡片是在核对记录，而不是快速浏览。
+ * `prompt`、`thinking`、`path`、`command` 和 `tool` 对某些类型来说重复了标题中
+ * 已有的内容，但读者展开卡片是在核对记录，而不是快速浏览。
  * @param card - 正在展开的卡片。
  * @param t - 评审链翻译器。
  * @returns 按固定字段顺序排列的行；卡片没有记录任何内容时为空。
  */
 export function detailRows(card: ChainCard, t: ChainTranslate): readonly ChainDetailRow[] {
   const rows: ChainDetailRow[] = []
+  const prompt = metaString(card.meta, 'prompt')
+  if (prompt !== undefined) rows.push({ label: t('meta.prompt'), value: prompt })
+  const thinking = metaString(card.meta, 'thinking')
+  if (thinking !== undefined) rows.push({ label: t('meta.thinking'), value: thinking })
   const path = metaString(card.meta, 'path')
   if (path !== undefined) rows.push({ label: t('meta.path'), value: path, file: path })
   const command = metaString(card.meta, 'command')
@@ -315,8 +380,8 @@ export function evidenceSpans(card: ChainCard, spans: readonly ActivitySpan[]): 
  * 判断卡片是否有可展示的内容。
  * @param card - 列表中的卡片。
  * @param rows - 它的展开事实。
- * @returns 展开后会显示事实或依据时为 true。
+ * @returns 展开后会显示事实、差异或依据时为 true。
  */
 export function isExpandable(card: ChainCard, rows: readonly ChainDetailRow[]): boolean {
-  return rows.length > 0 || card.evidenceSeqs.length > 0
+  return rows.length > 0 || card.evidenceSeqs.length > 0 || (card.diffs?.length ?? 0) > 0
 }

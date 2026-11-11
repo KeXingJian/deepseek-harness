@@ -1,5 +1,5 @@
 ---
-description: "面向评审的执行链：把 agent 活动 span 折叠成六类可读卡片，并给出评审风险标记。"
+description: "面向评审的执行链：把 agent 活动 span 折叠成八类可读卡片，并给出评审风险标记。"
 kind: "package-reference"
 ---
 
@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-按序号顺序传入采集层 span，调用 `chainFromSpans(spans, userText?)`，得到 `{ cards, flags }`。
+按序号顺序传入采集层 span，调用 `chainFromSpans(spans, userText?, diffs?)`，得到 `{ cards, flags }`。
 
 ```ts
 import { chainFromSpans } from '@deepseek-ai/dsh-agent-activity'
@@ -53,6 +53,8 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 
 | 类型 | 来源 span | 回答的问题 |
 |---|---|---|
+| `prompt` | 带人类 `user/message` 来源 `prompt` 属性的 `turn` | 人要求它做什么 |
+| `thinking` | 带本步骤 `assistant/message` 思考原文的 `step` | 动手之前它想了什么 |
 | `intent` | 带 `intent` 属性的 `turn` | 它打算做什么 |
 | `recon` | `read`/`grep`/`glob`/`list`/`lsp` 工具、子代理交接 | 它看了哪里 |
 | `change` | `write`/`edit` 工具与删除操作 | 它改了什么 |
@@ -60,9 +62,13 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 | `interrupt` | 审批与提问工具 | 人何时介入 |
 | `result` | 由整条链汇总 | 交付了什么 |
 
+回合的 `prompt` 卡依据写下它的那条 `user/message`；插件上下文、召回历史、目标续跑等合成 user 角色注入不是人类提示词，不产生卡片。记录了思考的步骤出一张 `thinking` 卡，依据它展示思考的那条 `assistant/message`；该步骤的工具调用成为它的 `children`，以子卡形式挂在它下面，思考卡用 `actions` 给出它们的计数，一行读完"想了什么、做了什么"。没有记录思考的步骤，工具卡片留在链上平铺，也不出思考卡。
+
 合并规则保留评审语义：相邻的勘察卡合成一张计数摘要，同一文件的重复修改合成一张并带 `repeat` 次数，失败验证永不合并，连续成功验证折叠为一张。整条链有上限，长会话仍能一屏读完。
 
-卡片标题是 `ChainTitle` 消息描述符——说明适用哪条消息以及要插值的值——`meta` 则以机器可读形式重复同一批事实，供展开与风险规则使用。只有 `intent` 标题是记录下来的文本。消费视图通过自己的语言字典映射每个描述符，因此投影从不书写产品文案。
+卡片标题是 `ChainTitle` 消息描述符——说明适用哪条消息以及要插值的值——`meta` 则以机器可读形式重复同一批事实，供展开与风险规则使用。只有 `prompt`、`thinking` 与 `intent` 标题是记录下来的文本。消费视图通过自己的语言字典映射每个描述符，因此投影从不书写产品文案。
+
+`change` 卡片还可以携带 `diffs`：该工具为这个文件记录下来的变更前后原文，每个应用后的差异块一条。投影不据此计算补丁，只把调用方以工具调用标识索引传入的 `diffs` 挂到卡片上；同一文件的两次改动合并时，差异块按顺序拼接。这样 span 属性保持很小——文件文本本来就在日志的工具结果里——而视图仍然能渲染行级差异。
 
 ### 风险标记
 
@@ -108,9 +114,12 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 - **不提供服务也不做持久化** —— 本包只投影调用方给出的 Session 事件或 span；持久化、实时投递与渲染属于消费插件。
 - **只读持久事件** —— 审批、子代理交接、工作流阶段属于实时 Cordis 事件而非 Session 记录，因此从日志折叠出的链不包含它们。
 - **意图是模型原话** —— `intent` 卡取该轮第一个非空 assistant 文本块，不是本包生成的摘要。
-- **范围外匹配是启发式** —— 它把改动路径与会话读过的路径、调用方给出的任务文本比对，并按"推断"呈现结果。
+- **提示词取第一条人类消息** —— `prompt` 是该轮第一条人类 `user/message`，标题中截断、`meta` 中有长度上限；同轮后续的人类插话不进链。
+- **思考按步骤划分** —— `thinking` 卡只承载一个步骤的思考；没有开启步骤时到达的思考会被丢弃，步骤的行动由行动卡所用的同一套归类计数，因此未知工具既不算文件也不算检索。
+- **范围外匹配是启发式** —— 它把改动路径与会话读过的路径、任务文本（调用方传入的文本，或链中记录的提示词）比对，并按"推断"呈现结果。
 - **目前只有一个消费方** —— `dsh-client-ui-agent-chain` 渲染这些卡片与标记；从卡片跳回依据属于该视图的工作。
 - **不推断删除行数** —— 删除只报告文件，不报告会话并未记录的行数。
+- **差异由调用方提供** —— 只由 span 折叠出的链不带差异；持有已记录工具结果的调用方把它们作为 `chainFromSpans` 的第三项传入，因此结果里没有记录 `diffs` 的工具只显示事实、不显示差异。
 - **上限只压缩勘察卡** —— 会话若改了三十个以上不同文件，仍会一文件一卡；把不同文件合并起来，恰好会藏掉评审员必须看的东西。
 
 <a id="dev-note"></a>

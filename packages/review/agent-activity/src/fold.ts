@@ -44,6 +44,9 @@ const READ_ARGUMENTS = ['command', 'pattern', 'op'] as const
 /** 文件变更工具在 `tool/result` 的私有 `meta` 中上报的操作类型。 */
 const MUTATION_OPERATIONS: ReadonlySet<string> = new Set(['create', 'update', 'delete'])
 
+/** 记入跨度属性的提示词与思考原文的字符上限；展开视图读取的正是这段原文。 */
+const ATTRIBUTE_TEXT_LIMIT = 2000
+
 /** 工具结果的私有 `meta` 负载，按事件类型取出以免复制其形状定义。 */
 type ToolResultMeta = Extract<SessionEvent, { type: 'tool/result' }>['data']['meta']
 
@@ -120,6 +123,44 @@ function intentOf(content: readonly { type: string; text?: string }[]): string |
     if (text !== undefined && text !== '') return text
   }
   return undefined
+}
+
+/**
+ * 指定类别的文本块按记录顺序以空行连接，并截断到属性上限。
+ * @param content - 消息内容块。
+ * @param type - 要收集的块类别：用户可见文本或助手思考。
+ * @returns 连接后的文本；该类文本块都不存在时返回 undefined。
+ */
+function contentText(
+  content: readonly { type: string; text?: string }[],
+  type: 'text' | 'reasoning',
+): string | undefined {
+  const parts: string[] = []
+  for (const block of content) {
+    if (block.type !== type) continue
+    const text = block.text?.trim()
+    if (text !== undefined && text !== '') parts.push(text)
+  }
+  return parts.length === 0 ? undefined : parts.join('\n\n').slice(0, ATTRIBUTE_TEXT_LIMIT)
+}
+
+/** 步骤已记录的思考之后追加一段原文，并保留开头一段有界文本。 */
+function appendedThinking(previous: string | number | boolean | undefined, thinking: string): string {
+  const text = typeof previous === 'string' ? `${previous}\n\n${thinking}` : thinking
+  return text.slice(0, ATTRIBUTE_TEXT_LIMIT)
+}
+
+/**
+ * 最近开启且仍在运行的回合跨度下标。
+ *
+ * `user/message` 不携带回合编号：用户在回合中途插话时，提示词属于当前打开的回合。
+ * @param state - 当前折叠状态。
+ * @returns 最近开启的回合跨度下标；没有开启中的回合时为 undefined。
+ */
+function latestOpenTurn(state: ActivityState): number | undefined {
+  // 跨度下标随开启顺序单调递增，因此最近开启的回合就是下标最大的那个。
+  const indexes = Object.values(state.openTurns)
+  return indexes.length === 0 ? undefined : Math.max(...indexes)
 }
 
 /** 替换一个跨度，并保留其余所有跨度引用。 */
@@ -206,13 +247,42 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
         openSteps: released(state.openSteps, key),
       }
     }
-    case 'assistant/message': {
-      const index = state.openTurns[String(event.data.turn)]
+    case 'user/message': {
+      const index = latestOpenTurn(state)
       const span = index === undefined ? undefined : state.spans[index]
-      if (index === undefined || span === undefined || span.attributes?.intent !== undefined) return state
-      const intent = intentOf(event.data.message.content)
-      if (intent === undefined) return state
-      return closed(state, index, span, { ...span, attributes: { ...span.attributes, intent } })
+      if (index === undefined || span === undefined || span.attributes?.prompt !== undefined) return state
+      const prompt = event.data.source.kind === 'user' ? contentText(event.data.content, 'text') : undefined
+      if (prompt === undefined) return state
+      return closed(state, index, span, {
+        ...span,
+        attributes: { ...span.attributes, prompt, promptSeq: event.seq },
+      })
+    }
+    case 'assistant/message': {
+      const content = event.data.message.content
+      const turnIndex = state.openTurns[String(event.data.turn)]
+      const turnSpan = turnIndex === undefined ? undefined : state.spans[turnIndex]
+      let next = state
+      if (turnIndex !== undefined && turnSpan !== undefined && turnSpan.attributes?.intent === undefined) {
+        const intent = intentOf(content)
+        if (intent !== undefined) {
+          next = closed(state, turnIndex, turnSpan, { ...turnSpan, attributes: { ...turnSpan.attributes, intent } })
+        }
+      }
+      const stepKey = `${String(event.data.turn)}:${String(event.data.step)}`
+      const stepIndex = next.openSteps[stepKey]
+      const stepSpan = stepIndex === undefined ? undefined : next.spans[stepIndex]
+      const thinking = contentText(content, 'reasoning')
+      if (stepIndex === undefined || stepSpan === undefined || thinking === undefined) return next
+      // 思考属于它所在的步骤：同一步骤的工具调用就是这段思考驱动的行动。
+      return closed(next, stepIndex, stepSpan, {
+        ...stepSpan,
+        attributes: {
+          ...stepSpan.attributes,
+          thinking: appendedThinking(stepSpan.attributes?.thinking, thinking),
+          thinkingSeq: stepSpan.attributes?.thinkingSeq ?? event.seq,
+        },
+      })
     }
     case 'tool/call': {
       const attributes = attributesOf(event.data.arguments)

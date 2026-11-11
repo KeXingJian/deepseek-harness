@@ -2814,7 +2814,17 @@
     },
     {
       "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChainActions",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
       "symbol": "ChainCard",
+      "source": "packages/review/agent-activity/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/review-chain.md",
+      "symbol": "ChainDiff",
       "source": "packages/review/agent-activity/src/types.ts"
     },
     {

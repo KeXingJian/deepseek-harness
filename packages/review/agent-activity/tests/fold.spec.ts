@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createAssistantMessage, createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createToolResultMessage, createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { applyActivityEvent, chainFromSpans, createActivityFolder, foldActivity, initActivityState } from '../src/index.ts'
@@ -39,7 +39,13 @@ function stepEnd(seq: number, time: number, turn: number, step: number): Session
 }
 
 /** Build an `assistant/message` event carrying the given content blocks. */
-function assistant(seq: number, time: number, turn: number, blocks: readonly ContentBlock[]): SessionEvent {
+function assistant(
+  seq: number,
+  time: number,
+  turn: number,
+  blocks: readonly ContentBlock[],
+  step = 1,
+): SessionEvent {
   return {
     type: 'assistant/message',
     seq: SessionSeq(seq),
@@ -47,13 +53,24 @@ function assistant(seq: number, time: number, turn: number, blocks: readonly Con
     surfaceOp: 'append',
     data: {
       turn,
-      step: 1,
+      step,
       message: createAssistantMessage({
         content: blocks,
         source: { provider: 'test', model: 'test-model' },
       }),
       stream: [],
     },
+  }
+}
+
+/** Build a `user/message` event carrying one text block. */
+function userMessage(seq: number, time: number, text: string, source: MessageSource = { kind: 'user' }): SessionEvent {
+  return {
+    type: 'user/message',
+    seq: SessionSeq(seq),
+    time,
+    surfaceOp: 'append',
+    data: createUserMessage({ content: [{ type: 'text', text }], source }),
   }
 }
 
@@ -282,6 +299,87 @@ describe('foldActivity', () => {
       assistant(2, 30, 1, [{ type: 'text', text: '第二个意图' }]),
     ])
     expect(spans[0]?.attributes?.intent).toBe('第一个意图')
+  })
+
+  it('records the human prompt of a turn with the event it came from', () => {
+    const spans = foldActivity([
+      turnStart(0, 100, 1),
+      userMessage(1, 110, '  修复登录页的重定向  '),
+      turnEnd(2, 120, 1, 'completed'),
+    ])
+    expect(spans[0]?.attributes).toMatchObject({ prompt: '修复登录页的重定向', promptSeq: 1 })
+  })
+
+  it('ignores synthetic prompts and prompts of a closed turn', () => {
+    const synthetic = foldActivity([
+      turnStart(0, 100, 1),
+      userMessage(1, 110, '系统注入的上下文', { kind: 'tool', callId: ToolCallId('call-1') }),
+    ])
+    expect(synthetic[0]?.attributes?.prompt).toBeUndefined()
+
+    const late = foldActivity([
+      turnStart(0, 100, 1),
+      turnEnd(1, 110, 1, 'completed'),
+      userMessage(2, 120, '迟到的提问'),
+    ])
+    expect(late[0]?.attributes?.prompt).toBeUndefined()
+  })
+
+  it('keeps the first human prompt of a turn and skips one without text', () => {
+    const first = foldActivity([
+      turnStart(0, 100, 1),
+      userMessage(1, 110, '第一个提示'),
+      userMessage(2, 120, '中途插话'),
+    ])
+    expect(first[0]?.attributes?.prompt).toBe('第一个提示')
+
+    const blank = foldActivity([
+      turnStart(0, 100, 1),
+      userMessage(1, 110, '   '),
+      userMessage(2, 120, '第二个提示'),
+    ])
+    expect(blank[0]?.attributes?.prompt).toBe('第二个提示')
+  })
+
+  it('records the step its thinking belongs to, and the turn its intent belongs to', () => {
+    const spans = foldActivity([
+      turnStart(0, 100, 1),
+      stepStart(1, 105, 1, 1),
+      assistant(2, 110, 1, [{ type: 'reasoning', text: '先看看路由' }, { type: 'text', text: '检查登录流程' }]),
+      assistant(3, 120, 1, [{ type: 'reasoning', text: '再补一个测试' }]),
+    ])
+    expect(spans[0]?.attributes).toMatchObject({ intent: '检查登录流程' })
+    expect(spans[1]?.attributes).toMatchObject({ thinking: '先看看路由\n\n再补一个测试', thinkingSeq: 2 })
+  })
+
+  it('keeps the thinking of each step apart', () => {
+    const spans = foldActivity([
+      turnStart(0, 100, 1),
+      stepStart(1, 105, 1, 1),
+      assistant(2, 110, 1, [{ type: 'reasoning', text: '第一步' }], 1),
+      stepEnd(3, 120, 1, 1),
+      stepStart(4, 130, 1, 2),
+      assistant(5, 140, 1, [{ type: 'reasoning', text: '第二步' }], 2),
+    ])
+    expect(spans.filter(span => span.kind === 'step').map(span => span.attributes?.thinking))
+      .toEqual(['第一步', '第二步'])
+  })
+
+  it('drops thinking that arrives without an open step', () => {
+    const spans = foldActivity([
+      turnStart(0, 100, 1),
+      assistant(1, 110, 1, [{ type: 'reasoning', text: '没有步骤' }]),
+    ])
+    expect(spans[0]?.attributes?.thinking).toBeUndefined()
+  })
+
+  it('bounds the recorded thinking to the attribute text limit', () => {
+    const spans = foldActivity([
+      turnStart(0, 100, 1),
+      stepStart(1, 105, 1, 1),
+      assistant(2, 110, 1, [{ type: 'reasoning', text: 'x'.repeat(2500) }]),
+    ])
+    expect(String(spans[1]?.attributes?.thinking)).toHaveLength(2000)
   })
 
   it('ignores event types it does not read', () => {
