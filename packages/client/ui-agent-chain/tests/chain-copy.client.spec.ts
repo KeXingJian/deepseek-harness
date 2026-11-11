@@ -10,8 +10,8 @@ import { en, type AgentChainKey } from '../src/client/locales.ts'
 import { relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_GLYPHS, KIND_KEYS, SEVERITY_KEYS, SEVERITY_TONES,
-  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, isExpandable, riskReason,
-  spanDot, statusDot,
+  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, hideReconCards,
+  isExpandable, riskReason, spanDot, statusDot,
 } from '../src/client/chain-copy.ts'
 import type { ChainPathLabel } from '../src/client/chain-copy.ts'
 
@@ -265,6 +265,36 @@ describe('filterCards', () => {
       children: [card({ id: 'recon:2', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } })],
     })
     expect(filterCards([nested], 'risks').map(entry => entry.id)).toEqual(['thinking:1'])
+  })
+})
+
+describe('hideReconCards', () => {
+  const cards = [
+    intent('plan'),
+    card({ kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }),
+    card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' } }),
+  ]
+
+  it('keeps the whole list when recon stays visible', () => {
+    expect(hideReconCards(cards, false)).toBe(cards)
+  })
+
+  it('drops every recon card when the reader hides recon', () => {
+    expect(hideReconCards(cards, true).map(entry => entry.kind)).toEqual(['intent', 'change'])
+  })
+
+  it('keeps a parent with its remaining children and drops only the recon child', () => {
+    const nested = card({
+      kind: 'thinking',
+      title: { copy: 'thinking', text: 'change the router' },
+      children: [
+        card({ id: 'recon:2', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }),
+        card({ id: 'change:3', kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' } }),
+      ],
+    })
+    const [kept] = hideReconCards([nested], true)
+    expect(kept?.id).toBe('thinking:1')
+    expect(kept?.children?.map(entry => entry.id)).toEqual(['change:3'])
   })
 })
 

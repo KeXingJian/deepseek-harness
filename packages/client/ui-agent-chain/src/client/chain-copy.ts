@@ -299,6 +299,24 @@ export function filterCards(cards: readonly ChainCard[], filter: ChainFilter): r
 }
 
 /**
+ * 隐藏或显示勘察卡片，勘察是背景工作，评审者常整段跳过。
+ *
+ * 隐藏时把每条顶层勘察卡片连同它折叠出的内容一起删除；思考卡片下的勘察
+ * 子卡跟着父卡一起保留或移除。筛选器随后再收窄结果。
+ * @param cards - 按展示顺序排列的顶层卡片。
+ * @param hidden - 是否隐藏勘察卡片。
+ * @returns 隐藏时过滤后的卡片；显示时保持输入数组不变。
+ */
+export function hideReconCards(cards: readonly ChainCard[], hidden: boolean): readonly ChainCard[] {
+  if (!hidden) return cards
+  return cards.flatMap((card) => {
+    const children = card.children === undefined ? undefined : hideReconCards(card.children, hidden)
+    if (card.kind === 'recon') return []
+    return [children === undefined ? card : { ...card, children }]
+  })
+}
+
+/**
  * 把 span 的结算结果映射到共享的状态圆点。
  * @param status - span 上记录的结算结果。
  * @returns 圆点状态；在结算前就停止的 span 显示为警告。

@@ -1,10 +1,10 @@
 /**
- * 评审链视图：风险横幅、三个卡片筛选器，以及评审者无需打开转录即可浏览的
- * 可读卡片列表。思考卡片带着它触发的行动子卡，展开后会显示折叠出该卡片的
- * 文件和原始 span。
+ * 评审链视图：风险横幅、三个卡片筛选器、勘察卡显隐开关、右侧定位条，
+ * 以及评审者无需打开转录即可浏览的可读卡片列表。列表随滚动按页追加渲染。
+ * 思考卡片带着它触发的行动子卡，展开后会显示折叠出该卡片的文件和原始 span。
  */
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
@@ -18,9 +18,12 @@ import type { ChainSnapshot } from './chain-view.ts'
 import type { ChainEvidenceSpan, ChainFilter, ChainPathLabel, ChainTranslate } from './chain-copy.ts'
 import {
   CHAIN_FILTERS, FILTER_KEYS, KIND_GLYPHS, KIND_KEYS, SEVERITY_KEYS, SEVERITY_TONES,
-  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, isExpandable, riskReason,
-  statusDot,
+  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, hideReconCards,
+  isExpandable, riskReason, statusDot,
 } from './chain-copy.ts'
+import { locatorBars, scrollToCard, useActiveBar } from './locator.ts'
+import type { ChainLocatorBar } from './locator.ts'
+import { useRenderedCount, useSentinelAppend } from './stream.ts'
 import css from './AgentChainView.module.css'
 
 /** 展开的改动卡片先显示的行数；其余行由卡片自身的折叠控件展开。 */
@@ -121,7 +124,7 @@ function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, 
   const evidence = open ? evidenceSpans(card, spans) : []
   const Glyph = KIND_GLYPHS[card.kind]
   return (
-    <li className={css.card} data-kind={card.kind} data-status={card.status}>
+    <li className={css.card} data-kind={card.kind} data-status={card.status} data-card-id={card.id}>
       <div className={css.head}>
         <StateDot state={statusDot(card.status)} />
         <span className={css.kind}>
@@ -197,10 +200,42 @@ function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, 
   )
 }
 
+/** 右侧定位条：每张顶层卡片一根横杠，标出当前读到的位置。 */
+function ChainLocator({ bars, active, onJump, t }: {
+  bars: readonly ChainLocatorBar[]
+  active: number | undefined
+  onJump: (index: number, id: string) => void
+  t: AgentChainViewProps['t']
+}) {
+  const rail = useRef<HTMLElement | null>(null)
+  // 当前横杠滚出定位条时把它带回来，读者始终看得见自己读到哪里。
+  useEffect(() => {
+    rail.current?.querySelector<HTMLElement>('[data-active]')?.scrollIntoView({ block: 'nearest' })
+  }, [active])
+  return (
+    <nav ref={rail} className={css.locator} aria-label={t('locator.aria')}>
+      {bars.map((bar, index) => (
+        <button
+          key={bar.id}
+          type="button"
+          className={css.locatorBar}
+          data-kind={bar.kind}
+          data-active={index === active ? '' : undefined}
+          aria-current={index === active ? 'location' : undefined}
+          aria-label={`${t('locator.jump')} ${bar.title}`}
+          title={bar.title}
+          onClick={() => { onJump(index, bar.id) }}
+        />
+      ))}
+    </nav>
+  )
+}
+
 /**
  * 渲染评审执行链。
  * @param props - 绑定的快照 hook、翻译器、文件打开器和调用查看器。
- * @returns 左侧风险栏及其可折叠入口、筛选器和卡片列表，或空状态提示。
+ * @returns 左侧风险栏及其可折叠入口、筛选器与勘察显隐按钮、右侧定位条和卡片列表，
+ *   或空状态提示。
  */
 export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, inspectCall }: AgentChainViewProps) {
   const chain = useChain(snapshot => snapshot)
@@ -209,14 +244,34 @@ export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, 
   const [filter, setFilter] = useState<ChainFilter>('all')
   const [expanded, setExpanded] = useState<readonly string[]>([])
   const [risksOpen, setRisksOpen] = useState(true)
-  if (chain.cards.length === 0) return <p className={css.empty}>{t('empty.waiting')}</p>
-  const cards = filterCards(chain.cards, filter)
-  const flags = chain.flags
+  const [reconHidden, setReconHidden] = useState(false)
+  const [list, setList] = useState<HTMLOListElement | null>(null)
+  const [jumpTo, setJumpTo] = useState<string | null>(null)
+  const cards = useMemo(() => filterCards(hideReconCards(chain.cards, reconHidden), filter), [chain.cards, reconHidden, filter])
+  const { count: shown, more, showThrough } = useRenderedCount(cards.length, `${filter}:${String(reconHidden)}`)
+  // 代号取自已渲染卡片的标识：换筛选器、换会话或追加一页都会换掉它，观察者随之重建。
+  const rowsKey = useMemo(() => cards.slice(0, shown).map(card => card.id).join('|'), [cards, shown])
+  const active = useActiveBar(list, rowsKey)
+  const sentinel = useSentinelAppend(more, shown)
+  const bars = useMemo(() => locatorBars(cards, t, label), [cards, t, label])
+  const jump = useCallback((index: number, id: string) => {
+    // 目标还没渲染时先把它渲染出来，提交后的 Effect 负责滚动。
+    showThrough(index)
+    setJumpTo(id)
+  }, [showThrough])
+  useEffect(() => {
+    if (jumpTo !== null && list !== null) {
+      scrollToCard(list, jumpTo)
+      setJumpTo(null)
+    }
+  }, [jumpTo, list, shown])
   const toggle = (id: string): void => {
     setExpanded(current => (current.includes(id)
       ? current.filter(entry => entry !== id)
       : [...current, id]))
   }
+  if (chain.cards.length === 0) return <p className={css.empty}>{t('empty.waiting')}</p>
+  const flags = chain.flags
   return (
     <div className={css.root}>
       <div className={css.board} data-risks={flags.length === 0 ? 'none' : risksOpen ? 'open' : 'closed'}>
@@ -268,31 +323,58 @@ export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, 
             </aside>
           ))}
         <div className={css.main}>
-          <div className={css.filters} role="group" aria-label={t('filter.aria')}>
-            {CHAIN_FILTERS.map(value => (
-              <Pill key={value} active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value) }}>
-                {t(FILTER_KEYS[value])}
-              </Pill>
-            ))}
+          <div className={css.toolbar}>
+            <div className={css.filters} role="group" aria-label={t('filter.aria')}>
+              {CHAIN_FILTERS.map(value => (
+                <Pill key={value} active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value) }}>
+                  {t(FILTER_KEYS[value])}
+                </Pill>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={css.reconToggle}
+              aria-pressed={reconHidden}
+              title={t(reconHidden ? 'recon.show' : 'recon.hide')}
+              onClick={() => { setReconHidden(hidden => !hidden) }}
+            >
+              {t(reconHidden ? 'recon.show' : 'recon.hide')}
+            </button>
           </div>
           {cards.length === 0
             ? <p className={css.empty}>{t('empty.filtered')}</p>
             : (
-              <ol className={css.cards}>
-                {cards.map(card => (
-                  <ChainCardRow
-                    key={card.id}
-                    card={card}
-                    spans={chain.spans}
-                    expanded={expanded}
-                    onToggle={toggle}
-                    openFile={openFile}
-                    inspectCall={inspectCall}
-                    label={label}
-                    t={t}
-                  />
-                ))}
-              </ol>
+              <div className={css.stream} data-locator={bars.length > 1 ? '' : undefined}>
+                <div className={css.column}>
+                  <ol className={css.cards} ref={setList}>
+                    {cards.slice(0, shown).map(card => (
+                      <ChainCardRow
+                        key={card.id}
+                        card={card}
+                        spans={chain.spans}
+                        expanded={expanded}
+                        onToggle={toggle}
+                        openFile={openFile}
+                        inspectCall={inspectCall}
+                        label={label}
+                        t={t}
+                      />
+                    ))}
+                  </ol>
+                  {shown < cards.length && (
+                    <div ref={sentinel} className={css.sentinel}>
+                      <button type="button" className={css.moreButton} onClick={more}>
+                        {t('stream.more', { shown, total: cards.length })}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {bars.length > 1 && (
+                  <div className={css.locatorTrack}>
+                    <ChainLocator bars={bars} active={active} onJump={jump} t={t} />
+                  </div>
+                )}
+              </div>
             )}
         </div>
       </div>

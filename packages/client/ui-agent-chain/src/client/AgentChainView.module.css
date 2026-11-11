@@ -48,11 +48,194 @@
   gap: 8px;
 }
 
+/* 筛选器与勘察显隐按钮同一行：筛选器靠左，勘察按钮贴右，不随筛选器换行漂移。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+/* 勘察显隐：切换按钮，按下态表示勘察已被隐藏。文字随状态改变，
+   因此该控件本身说明当前做了什么，而不是只靠颜色。 */
+.reconToggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  corner-shape: round;
+  height: 24px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font: var(--dsw-font-xxs-12);
+  gap: 2px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .reconToggle:hover {
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.reconToggle[aria-pressed='true'] {
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-button-ghost-active-fill);
+}
+
+.reconToggle:focus-visible {
+  outline-offset: 1px;
+}
+
+/* 卡片区与右侧定位条共用一行：卡片列占满剩余宽度，定位条贴在滚动容器右侧。
+   只有一张卡片时定位条没有意义，卡片列独占整行。 */
+.stream {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  gap: 8px;
+}
+
+.stream[data-locator] {
+  grid-template-columns: minmax(0, 1fr) 28px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+}
+
+/* 定位条的滚动区：占满卡片列的高度，让吸附中的横杠列在整列范围内移动。 */
+.locatorTrack {
+  align-self: stretch;
+  min-width: 0;
+}
+
+/* 定位条：粘在滚动容器中途，纵向排列每张顶层卡片一根横杠。
+   横杠颜色跟随卡片作用域，读者能按段扫读；比可见带更高时条内自行滚动。 */
+.locator {
+  position: sticky;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  padding: 4px 0;
+  gap: 1px;
+  scrollbar-width: none;
+  transform: translateY(-50%);
+}
+
+.locator::-webkit-scrollbar {
+  display: none;
+}
+
+.locatorBar {
+  width: 20px;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: var(--dsw-alias-border-l4);
+  cursor: pointer;
+  transform: scaleX(0.6);
+  transform-origin: right center;
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.locatorBar[data-kind='prompt'] {
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.locatorBar[data-kind='thinking'],
+.locatorBar[data-kind='intent'] {
+  background: var(--dsw-alias-state-done-primary);
+}
+
+.locatorBar[data-kind='change'],
+.locatorBar[data-kind='interrupt'] {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.locatorBar[data-kind='verify'] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.locatorBar[data-kind='result'] {
+  background: var(--dsw-alias-label-primary);
+}
+
+@media (hover: hover) {
+  .locatorBar:hover {
+    transform: scaleX(0.9);
+  }
+}
+
+.locatorBar[data-active] {
+  background: var(--dsw-alias-label-primary);
+  transform: scaleX(1);
+}
+
+.locatorBar:focus-visible {
+  outline-offset: 1px;
+}
+
+/* 追加渲染的入口：仍在视口内时自动追加，同时保留一个可点击的按钮，
+   让没有 IntersectionObserver 的浏览器和键盘读者也能继续。 */
+.sentinel {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+.moreButton {
+  padding: 3px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  corner-shape: round;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .moreButton:hover {
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.moreButton:focus-visible {
+  outline-offset: 1px;
+}
+
+/* 视图列变窄时定位条让位：横向空间全部留给卡片，读者仍可用滚动访问。 */
+@container (max-width: 560px) {
+  .stream {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .locator {
+    display: none;
+  }
 }
 
 /* 风险栏：粘在滚动容器上沿，卡片流滚动时评审者仍能读到风险。 */

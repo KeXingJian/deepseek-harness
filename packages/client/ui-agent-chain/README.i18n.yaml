@@ -18,8 +18,11 @@
   en: 95fa8206ccfc180a
   zh: 7c5f0aa22f026eb4
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/reading-the-chain:
-  en: d75cf6db8ff780ed
-  zh: ddf1fd194e6fb7ac
+  en: 3a006e7c8cbd2bd4
+  zh: cb9c1d8e3f767c79
+/deepseek-ai-dsh-client-ui-agent-chain/use-this-package/navigating-and-streaming-a-long-chain:
+  en: b8dd5867bb7c6b84
+  zh: dc3c1c49466342a0
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/expanding-one-card:
   en: f4070b923d40f17d
   zh: 825cb1b10ba88b54
@@ -27,8 +30,8 @@
   en: f346780d5d51718c
   zh: c82cea9fae428c21
 /deepseek-ai-dsh-client-ui-agent-chain/understand-the-implementation:
-  en: 8e834b6de2c1873d
-  zh: a1657ce5d4bdc2d2
+  en: 8f5bed2359f0e354
+  zh: 383f2bb163ee0c92
 /deepseek-ai-dsh-client-ui-agent-chain/further-exploration:
   en: fbd7c7ad6dd1e778
   zh: 8c480f8cfbecefef
@@ -39,8 +42,8 @@
   en: 4f0eadf94828e66e
   zh: 9ab358160cac8d5e
 /deepseek-ai-dsh-client-ui-agent-chain/known-limitations-and-deferred-work:
-  en: f000f04ddbed8fdd
-  zh: 6a27ffad0aea9a87
+  en: 8808aeb8658c5098
+  zh: e8c14bfc95aa6a20
 /deepseek-ai-dsh-client-ui-agent-chain/known-limitations-and-deferred-work/dev-note:
   en: 0122e5768aba7266
   zh: 76ee5ad02be1be00

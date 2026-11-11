@@ -3,8 +3,8 @@
  * Review-chain view: the waiting state, card rows, per-card disclosure, the
  * three filters, the risk banner, and the review links a card offers.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
@@ -373,5 +373,100 @@ describe('risk rail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Changes only' }))
     expect(screen.getByRole('button', { name: 'Show risks' })).toBeTruthy()
     expect(screen.getByText('a.ts modified')).toBeTruthy()
+  })
+})
+
+describe('recon visibility', () => {
+  const recon = card({ id: 'recon:2', kind: 'recon', title: { copy: 'recon', files: 2, searches: 1 } })
+
+  it('shows recon cards by default and hides them on request', () => {
+    renderView([intent('inspect the catalog module'), recon])
+    const toggle = screen.getByRole('button', { name: 'Hide recon' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText('2 files, 1 searches')).toBeTruthy()
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Show recon' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByText('2 files, 1 searches')).toBeNull()
+    expect(screen.getByText('inspect the catalog module')).toBeTruthy()
+  })
+
+  it('reports an empty list when hiding recon leaves nothing', () => {
+    renderView([recon])
+    fireEvent.click(screen.getByRole('button', { name: 'Hide recon' }))
+    expect(screen.getByText('Nothing matches this filter')).toBeTruthy()
+  })
+})
+
+describe('card locator', () => {
+  /** A chain long enough to reach past the rendered page. */
+  function manyCards(count: number): ChainCard[] {
+    return Array.from({ length: count }, (_entry, index) => card({
+      id: `intent:${String(index)}`,
+      kind: 'intent',
+      title: { copy: 'intent', text: `step ${String(index)}` },
+    }))
+  }
+
+  /** jsdom implements no scrollIntoView; the locator calls it on the target card. */
+  const scrollIntoView = vi.fn()
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = scrollIntoView
+  })
+  afterEach(() => { scrollIntoView.mockClear() })
+
+  it('offers one bar per rendered card and jumps to the chosen one', () => {
+    renderView([intent('inspect the catalog module'), change('a.ts')])
+    const rail = screen.getByLabelText('Jump between chain cards')
+    const bars = within(rail).getAllByRole('button')
+    expect(bars.map(bar => bar.getAttribute('aria-label'))).toEqual([
+      'Jump to inspect the catalog module',
+      'Jump to a.ts modified',
+    ])
+    fireEvent.click(bars[1] as HTMLElement)
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="change:1"]'))
+  })
+
+  it('renders the rest of the chain when the reader asks for more', () => {
+    renderView(manyCards(45))
+    expect(screen.queryByText('step 44')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show more cards (40/45)' }))
+    expect(screen.getByText('step 44')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Show more cards (40/45)' })).toBeNull()
+  })
+
+  it('renders through a distant card the reader jumps to', () => {
+    renderView(manyCards(45))
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to step 44' }))
+    expect(screen.getByText('step 44')).toBeTruthy()
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="intent:44"]'))
+  })
+
+  it('marks the bar of the card the reader is looking at', () => {
+    const observers: { callback: IntersectionObserverCallback; targets: Element[] }[] = []
+    vi.stubGlobal('IntersectionObserver', class {
+      readonly targets: Element[] = []
+      constructor(readonly callback: IntersectionObserverCallback) {
+        observers.push(this)
+      }
+
+      observe(target: Element): void { this.targets.push(target) }
+
+      unobserve(): void {}
+
+      disconnect(): void {}
+
+      takeRecords(): IntersectionObserverEntry[] { return [] }
+    })
+    renderView([intent('inspect the catalog module'), change('a.ts')])
+    const observer = observers[0]!
+    const row = document.querySelector('[data-card-id="change:1"]')!
+    act(() => {
+      observer.callback([{ target: row, isIntersecting: true } as IntersectionObserverEntry], observer as never)
+    })
+    vi.unstubAllGlobals()
+    const rail = screen.getByLabelText('Jump between chain cards')
+    const bars = within(rail).getAllByRole('button')
+    expect(bars[1]?.getAttribute('aria-current')).toBe('location')
+    expect(bars[0]?.hasAttribute('data-active')).toBe(false)
   })
 })
