@@ -6,13 +6,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { AgentChainView, type AgentChainViewProps } from '../src/client/AgentChainView.tsx'
 import type { ChainSnapshot } from '../src/client/chain-view.ts'
 import { en, type AgentChainKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
+
+/** The Session the view renders; the fixture list holds no row for it, so paths stay as recorded. */
+const SESSION = 'session-1' as SessionId
+
+/** A Session list with no rows: no workspace root is known, so paths are not shortened. */
+const NO_SESSIONS: SessionListState = { ids: [], byId: {}, phase: 'ready', projectionsBySession: {} }
 
 /** Shipped English copy: the namespace's own entries over the shared common vocabulary. */
 const DICTIONARY: Readonly<Record<AgentChainKey | CommonKey, string>> = { ...commonEn, ...en }
@@ -70,8 +78,11 @@ function renderView(
 ) {
   const chain: ChainSnapshot = { cards, flags, spans: options.spans ?? [] }
   const useChain: AgentChainViewProps['useChain'] = selector => selector(chain)
+  const useSessions: AgentChainViewProps['useSessions'] = selector => selector(NO_SESSIONS)
   return render(
     <AgentChainView
+      sessionId={SESSION}
+      useSessions={useSessions}
       useChain={useChain}
       t={t}
       openFile={options.openFile ?? (() => {})}
@@ -107,6 +118,28 @@ describe('card rows', () => {
     renderView([card({ kind: 'result', title })])
     expect(screen.getByText('0 files changed, 0 verifications')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show evidence' })).toBeNull()
+  })
+
+  it('gives every card kind its own glyph and visible label', () => {
+    const titles: Readonly<Record<ChainCard['kind'], ChainTitle>> = {
+      prompt: { copy: 'prompt', text: 'fix the redirect' },
+      thinking: { copy: 'thinking', text: 'start with the router' },
+      intent: { copy: 'intent', text: 'inspect the catalog' },
+      recon: { copy: 'recon', files: 1, searches: 0 },
+      change: { copy: 'change', op: 'update', path: 'a.ts' },
+      verify: { copy: 'verifyPassed', command: 'go test' },
+      interrupt: { copy: 'interrupt', seconds: 3 },
+      result: { copy: 'result', files: 1, verifications: 1 },
+    }
+    const kinds = Object.keys(titles) as readonly ChainCard['kind'][]
+    renderView(kinds.map((kind, index) => card({ id: `${kind}:${String(index)}`, kind, title: titles[kind] })))
+    const glyphs = kinds.map((kind) => {
+      const row = document.querySelector(`[data-kind="${kind}"]`)
+      expect(row).toBeTruthy()
+      return row?.querySelector('svg')?.getAttribute('data-icon')
+    })
+    expect(new Set(glyphs).size).toBe(kinds.length)
+    for (const glyph of glyphs) expect(glyph).toMatch(/^dsw-icon-/)
   })
 })
 

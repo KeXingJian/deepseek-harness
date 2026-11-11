@@ -29,7 +29,7 @@ Mount the plugin beside `ui-conversation`, `ui-renderer`, and `ui-primitives`; i
 
 ### Reading the chain
 
-Each row shows a status dot, the card kind, one title line, and — when the projection merged repeated work — a repeat count. The card kinds are `prompt`, `thinking`, `intent`, `recon`, `change`, `verify`, `interrupt`, and `result`. A thinking card adds a second line with its step's action counts, composed in the reader's language, and owns that step's action cards as children: they render indented under it, each with its own disclosure, so one row reads "thought this, then did that" without leaving the step. The projection supplies each title as a message descriptor and keeps failures on their own cards; this package's dictionary owns the wording, and `chain-copy.ts` resolves it.
+Each row shows a status dot, a kind chip with that kind's glyph and name, one title line, and — when the projection merged repeated work — a repeat count. The card kinds are `prompt`, `thinking`, `intent`, `recon`, `change`, `verify`, `interrupt`, and `result`, and each reads apart at a glance: the chip carries its own ink and tint, a prompt is a filled block behind a leading rule, a change card is outlined, an interrupt is tinted amber, and the closing result sits below a rule. A thinking card adds a second line with its step's action counts, composed in the reader's language, and owns that step's action cards as children: they render indented under it, each with its own disclosure, so one row reads "thought this, then did that" without leaving the step. The projection supplies each title as a message descriptor and keeps failures on their own cards; this package's dictionary owns the wording, and `chain-copy.ts` resolves it.
 
 Three filters narrow the list: `All`, `Changes only`, and `Risks only`. `Risks only` keeps failed and warned cards, not the risk banner, which stays visible whenever the projection reports flags. A matching card nested under a thinking card is promoted to the top level, so a filter never loses a change or a risk behind its parent. A filter that matches nothing shows its own empty line rather than the waiting state.
 
@@ -39,7 +39,7 @@ The disclosure button reveals what the card recorded: its named facts (the human
 
 ### Opening what a card names
 
-A path fact and a risk flag's files are buttons: each opens that file in the Sidebar preview, addressed under the Session's workspace root, so the reviewer reads the file beside the chain. An evidence row that came from a tool call opens that call in Trajectory through the conversation's inspection target; a turn or step span keeps its sequence but has no call to inspect.
+Paths display relative to the Session's workspace root, and the recorded path stays available on hover. A path fact and a risk flag's files are buttons: each opens that file in the Sidebar preview, addressed under the same root, so the reviewer reads the file beside the chain. An evidence row that came from a tool call opens that call in Trajectory through the conversation's inspection target; a turn or step span keeps its sequence but has no call to inspect.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -48,7 +48,7 @@ The plugin contributes four things in `apply`: the `agentChain` dictionary, one 
 
 - `chainDefinition` matches the eight durable event types the chain reads and folds them through `@deepseek-ai/dsh-agent-activity`. It also records the `diffs` payload of each `tool/result` under its call id, because a span keeps the call identity but not the file text; the view node passes that record to `chainFromSpans` as its third argument. Nothing extra is stored: the text stays in the tool result the log already holds. Every matched event is offered as a start candidate: the engine starts the Context from the earliest retained event of the loaded history window and applies the rest as updates, which also re-derives the chain when the window slides. The built node carries the folded chain and the spans it was folded from, so expansion can read one span by sequence.
 - `chainViewDefinition` publishes one snapshot per Session — `{ cards, flags, spans }` — from the node the Definition builds. The node reuses the engine-owned Context key; a hand-written key fails the engine's identity check.
-- `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. `chain-copy.ts` holds the filter, kind, and severity vocabulary, resolves a card title and a risk reason through the dictionary, and derives the expansion and evidence rows, so the component keeps no copy and no service access. The view receives `inspectCall` from the conversation view owner share and calls it with a span's recorded call identity.
+- `AgentChainView` renders the snapshot through the slot's `useChain` hook and its `t` seat. It reads the Session's workspace root through the framework's `useSessions` seat and shortens every displayed path against it, while `openFile` still receives the recorded path. `chain-copy.ts` holds the filter, kind-glyph, and severity vocabulary, resolves a card title and a risk reason through the dictionary, and derives the expansion and evidence rows, so the component keeps no copy and no service access. The view receives `inspectCall` from the conversation view owner share and calls it with a span's recorded call identity.
 - The slot's `inject` face resolves a card's path against the Session's workspace root — read from `sessions.list` at click time — and opens it through `sidebarRight.openResource` as a Session-scoped file address; the file preview owns reading the content.
 - Styling is a CSS Module over `--dsw-*` tokens; the root bounds itself to `--dsh-chat-content-width` and never scrolls on its own, because the conversation scrollport owns scrolling.
 
@@ -58,7 +58,7 @@ The plugin contributes four things in `apply`: the `agentChain` dictionary, one 
 - [Conversation view reference](../../../docs/subsystems/conversation.md) — Definitions, view targets, and the slot that hosts a view.
 - [Review activity chain](../../../docs/subsystems/review-chain.md) — the span and card types this view renders and the messages its dictionary resolves.
 - [`dsh-agent-activity`](../../review/agent-activity/README.md) — the span fold, the eight card kinds, and the risk rules this view renders.
-- [`dsh-client-ui-primitives`](../ui-primitives/README.md) — `Pill`, `Tag`, and `StateDot`, the controls this view composes.
+- [`dsh-client-ui-primitives`](../ui-primitives/README.md) — `Pill`, `Tag`, `StateDot`, and the product icons the kind chips use.
 
 <a id="model-experience"></a>
 ## Model Experience

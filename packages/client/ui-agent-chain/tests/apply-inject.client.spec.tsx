@@ -105,6 +105,16 @@ describe('review chain inject face', () => {
     await b.runtime.dispose()
   })
 
+  it('shows an absolute path relative to the project while opening the recorded one', async () => {
+    const b = await bench()
+    act(() => { b.chain.set(chainSnapshot('/proj/src/a.ts')) })
+    expect(b.chainView().getByText('src/a.ts modified')).toBeTruthy()
+    fireEvent.click(b.chainView().getByRole('button', { name: 'Show evidence' }))
+    fireEvent.click(b.chainView().getByRole('button', { name: 'Open in preview src/a.ts' }))
+    expect(b.openResource).toHaveBeenLastCalledWith('dsh-resource://file/session/root-1/src/a.ts')
+    await b.runtime.dispose()
+  })
+
   it('opens a cited tool call in the view that inspects calls', async () => {
     const b = await bench()
     act(() => { b.chain.set(chainSnapshot('src/a.ts')) })

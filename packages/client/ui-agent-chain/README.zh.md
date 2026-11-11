@@ -29,7 +29,7 @@ kind: "package-reference"
 
 ### 阅读执行链
 
-每行包含状态点、卡片类型、一行标题；投影合并了重复工作时还会带上重复次数。<br>卡片类型有 `prompt`、`thinking`、`intent`、`recon`、`change`、`verify`、`interrupt`、`result`。<br>思考卡片多一行该步骤的行动计数摘要，按读者语言组合，并拥有该步骤的行动子卡：子卡缩进挂在它下面，各自带展开按钮，一行读完"想了什么、做了什么"而不用离开这个步骤。<br>投影把每个标题作为消息描述符提供，失败卡片始终单独成卡；措辞由本包字典拥有，并由 `chain-copy.ts` 解析。
+每行包含状态点、带字形与类型名的类别标签、一行标题；投影合并了重复工作时还会带上重复次数。<br>卡片类型有 `prompt`、`thinking`、`intent`、`recon`、`change`、`verify`、`interrupt`、`result`，八类一眼就能分开：类别标签各用自身墨色与底色，提示词是带左侧竖线的填充块，改动卡片带描边，交接行是琥珀底色，收尾的结果行上方有一条分隔线。<br>思考卡片多一行该步骤的行动计数摘要，按读者语言组合，并拥有该步骤的行动子卡：子卡缩进挂在它下面，各自带展开按钮，一行读完"想了什么、做了什么"而不用离开这个步骤。<br>投影把每个标题作为消息描述符提供，失败卡片始终单独成卡；措辞由本包字典拥有，并由 `chain-copy.ts` 解析。
 
 三个筛选器收窄列表：`全部`、`仅看改动`、`只看风险`。<br>`只看风险` 只保留失败与告警卡片，不影响风险条——只要投影报告了标记，风险条就一直可见。<br>挂在思考卡片下的命中子卡会提升到顶层单独成行，筛选不会因为父卡片而漏掉某次改动或某个风险。<br>筛选结果为空时显示专门的空态，而不是“还没有记录到活动”。
 
@@ -39,7 +39,7 @@ kind: "package-reference"
 
 ### 打开卡片指向的对象
 
-路径事实与风险标记里的文件都是按钮：点击在右侧栏预览中打开该文件，地址按会话工作区根解析，评审者可以在执行链旁直接读文件。<br>来自工具调用的依据行会通过会话的检查目标在“轨迹”中打开该调用；轮次与步骤 span 保留序号，但没有可检查的调用。
+路径按会话工作区根显示为相对路径，记录时的路径留在悬停标题里。<br>路径事实与风险标记里的文件都是按钮：点击在右侧栏预览中打开该文件，地址按同一个根解析，评审者可以在执行链旁直接读文件。<br>来自工具调用的依据行会通过会话的检查目标在“轨迹”中打开该调用；轮次与步骤 span 保留序号，但没有可检查的调用。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -48,7 +48,7 @@ kind: "package-reference"
 
 - `chainDefinition` 匹配执行链读取的八种持久事件，并通过 `@deepseek-ai/dsh-agent-activity` 折叠它们。<br>它同时把每条 `tool/result` 的 `diffs` 负载按调用标识记录下来——span 只保留调用标识、不保留文件文本——构建节点时再把这份记录作为 `chainFromSpans` 的第三项传入。<br>额外不落任何东西：文本本来就在日志已有的工具结果里。<br>每个匹配事件都作为 start 候选：引擎用已加载历史窗口里最早的事件初始化 Context，其余按 update 应用，窗口滑动时也会重新推导执行链。<br>它构建的节点同时携带折叠结果与来源 span，因此展开时可以按序号读取单条 span。
 - `chainViewDefinition` 按会话发布一份快照 —— `{ cards, flags, spans }` —— 来自 Definition 构建的节点。<br>该节点复用引擎生成的 Context key；自己手写的 key 过不了引擎的身份校验。
-- `AgentChainView` 通过槽位的 `useChain` hook 与 `t` 座位渲染快照。<br>`chain-copy.ts` 持有筛选、类型、严重级的词汇，通过字典解析卡片标题与风险原因，并推导展开行与依据行，因此组件里既没有文案副本，也不访问服务。<br>视图从会话视图的 owner share 收到 `inspectCall`，并用 span 记录的调用标识调用它。
+- `AgentChainView` 通过槽位的 `useChain` hook 与 `t` 座位渲染快照。<br>它通过框架的 `useSessions` 座位读取会话工作区根，把每个要显示的路径相对它缩短，而 `openFile` 仍然收到记录时的路径。<br>`chain-copy.ts` 持有筛选、类型字形、严重级的词汇，通过字典解析卡片标题与风险原因，并推导展开行与依据行，因此组件里既没有文案副本，也不访问服务。<br>视图从会话视图的 owner share 收到 `inspectCall`，并用 span 记录的调用标识调用它。
 - 槽位的 `inject` 面在点击时从 `sessions.list` 读取会话工作区根，把卡片路径解析为会话作用域的文件地址并通过 `sidebarRight.openResource` 打开；读取文件内容由预览自己负责。
 - 样式是一个基于 `--dsw-*` 令牌的 CSS Module；根节点宽度限制在 `--dsh-chat-content-width`，自身不滚动，滚动由会话滚动容器负责。
 
@@ -58,7 +58,7 @@ kind: "package-reference"
 - [会话视图参考](../../../docs/subsystems/conversation.zh.md) —— Definition、视图 target 与承载视图的槽位。
 - [评审活动链](../../../docs/subsystems/review-chain.zh.md) —— 本视图渲染的 span 与卡片类型，以及其字典解析的消息。
 - [`dsh-agent-activity`](../../review/agent-activity/README.zh.md) —— 本视图渲染的 span 折叠、八类卡片与风险规则。
-- [`dsh-client-ui-primitives`](../ui-primitives/README.zh.md) —— 本视图组合的 `Pill`、`Tag`、`StateDot`。
+- [`dsh-client-ui-primitives`](../ui-primitives/README.zh.md) —— 本视图组合的 `Pill`、`Tag`、`StateDot`，以及类别标签使用的产品图标。
 
 <a id="model-experience"></a>
 ## 模型体验

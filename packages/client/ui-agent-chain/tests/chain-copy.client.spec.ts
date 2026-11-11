@@ -7,14 +7,22 @@ import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag, RiskReason } from '
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { en, type AgentChainKey } from '../src/client/locales.ts'
+import { relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
 import {
-  CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
+  CHAIN_FILTERS, FILTER_KEYS, KIND_GLYPHS, KIND_KEYS, SEVERITY_KEYS, SEVERITY_TONES,
   actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, isExpandable, riskReason,
   spanDot, statusDot,
 } from '../src/client/chain-copy.ts'
+import type { ChainPathLabel } from '../src/client/chain-copy.ts'
 
 /** Shipped English copy: the namespace's own entries over the shared common vocabulary. */
 const DICTIONARY: Readonly<Record<AgentChainKey | CommonKey, string>> = { ...commonEn, ...en }
+
+/** Paths as recorded, for cases that assert copy rather than path shortening. */
+const AS_RECORDED: ChainPathLabel = path => path
+
+/** The workspace-relative rewriter the view supplies, over a fixture project root. */
+const IN_PROJECT: ChainPathLabel = path => relativizeToCwd(path, '/proj')
 
 /** Translate through the shipped English dictionary, interpolating its placeholders. */
 function t(key: AgentChainKey | CommonKey, params?: Record<string, unknown>): string {
@@ -73,8 +81,8 @@ describe('filter vocabulary', () => {
     const kinds = ['prompt', 'thinking', 'intent', 'recon', 'change', 'verify', 'interrupt', 'result'] as const
     expect(kinds.map(kind => t(KIND_KEYS[kind])))
       .toEqual(['Prompt', 'Thinking', 'Intent', 'Recon', 'Change', 'Verify', 'Interrupt', 'Result'])
-    expect(kinds.map(kind => KIND_TONES[kind]))
-      .toEqual(['quiet', 'quiet', 'info', 'quiet', 'neutral', 'outline', 'warning', 'outline'])
+    // 字形是区分类别的第一层；八种类别各有自己的图形。
+    expect(new Set(kinds.map(kind => KIND_GLYPHS[kind])).size).toBe(kinds.length)
   })
 
   it('names and tones every risk severity', () => {
@@ -99,74 +107,85 @@ describe('spanDot', () => {
 
 describe('cardTitle', () => {
   it('shows a recorded intent verbatim', () => {
-    expect(cardTitle(intent('inspect the catalog module'), t)).toBe('inspect the catalog module')
+    expect(cardTitle(intent('inspect the catalog module'), t, AS_RECORDED)).toBe('inspect the catalog module')
   })
 
   it('shows a recorded human prompt verbatim', () => {
-    expect(cardTitle(card({ kind: 'prompt', title: { copy: 'prompt', text: 'fix the login redirect' } }), t))
+    expect(cardTitle(card({ kind: 'prompt', title: { copy: 'prompt', text: 'fix the login redirect' } }), t, AS_RECORDED))
       .toBe('fix the login redirect')
   })
 
   it('shows a recorded thinking line verbatim', () => {
-    expect(cardTitle(card({ kind: 'thinking', title: { copy: 'thinking', text: 'start with the router' } }), t))
+    expect(cardTitle(card({ kind: 'thinking', title: { copy: 'thinking', text: 'start with the router' } }), t, AS_RECORDED))
       .toBe('start with the router')
   })
 
   it('names whichever look-around totals are positive', () => {
     const recon = (files: number, searches: number): ChainTitle => ({ copy: 'recon', files, searches })
-    expect(cardTitle(card({ kind: 'recon', title: recon(2, 1) }), t)).toBe('2 files, 1 searches')
-    expect(cardTitle(card({ kind: 'recon', title: recon(3, 0) }), t)).toBe('3 files')
-    expect(cardTitle(card({ kind: 'recon', title: recon(0, 4) }), t)).toBe('4 searches')
-    expect(cardTitle(card({ kind: 'recon', title: recon(0, 0) }), t)).toBe('Looked around')
+    expect(cardTitle(card({ kind: 'recon', title: recon(2, 1) }), t, AS_RECORDED)).toBe('2 files, 1 searches')
+    expect(cardTitle(card({ kind: 'recon', title: recon(3, 0) }), t, AS_RECORDED)).toBe('3 files')
+    expect(cardTitle(card({ kind: 'recon', title: recon(0, 4) }), t, AS_RECORDED)).toBe('4 searches')
+    expect(cardTitle(card({ kind: 'recon', title: recon(0, 0) }), t, AS_RECORDED)).toBe('Looked around')
   })
 
   it('names the compressed look-around card', () => {
-    expect(cardTitle(card({ kind: 'recon', title: { copy: 'reconCollapsed' } }), t))
+    expect(cardTitle(card({ kind: 'recon', title: { copy: 'reconCollapsed' } }), t, AS_RECORDED))
       .toBe('Looked around and searched')
   })
 
   it('names a subagent hand-off', () => {
-    expect(cardTitle(card({ kind: 'recon', title: { copy: 'subagent', name: 'explorer' } }), t))
+    expect(cardTitle(card({ kind: 'recon', title: { copy: 'subagent', name: 'explorer' } }), t, AS_RECORDED))
       .toBe('Handed to subagent: explorer')
   })
 
   it('names both workflow settlements', () => {
-    expect(cardTitle(card({ kind: 'verify', title: { copy: 'workflowCompleted', name: 'scan' } }), t))
+    expect(cardTitle(card({ kind: 'verify', title: { copy: 'workflowCompleted', name: 'scan' } }), t, AS_RECORDED))
       .toBe('scan completed')
-    expect(cardTitle(card({ kind: 'verify', title: { copy: 'workflowFailed', name: 'fix' } }), t))
+    expect(cardTitle(card({ kind: 'verify', title: { copy: 'workflowFailed', name: 'fix' } }), t, AS_RECORDED))
       .toBe('fix failed')
   })
 
   it('names a human interrupt with its wait', () => {
-    expect(cardTitle(card({ kind: 'interrupt', title: { copy: 'interrupt', seconds: 42 } }), t))
+    expect(cardTitle(card({ kind: 'interrupt', title: { copy: 'interrupt', seconds: 42 } }), t, AS_RECORDED))
       .toBe('Asked for approval, waited 42s')
   })
 
   it('names every file operation', () => {
-    expect(cardTitle(card({ kind: 'change', title: { copy: 'change', op: 'create', path: 'a.ts' } }), t))
+    expect(cardTitle(card({ kind: 'change', title: { copy: 'change', op: 'create', path: 'a.ts' } }), t, AS_RECORDED))
       .toBe('a.ts created')
-    expect(cardTitle(card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' } }), t))
+    expect(cardTitle(card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' } }), t, AS_RECORDED))
       .toBe('a.ts modified')
-    expect(cardTitle(card({ kind: 'change', title: { copy: 'change', op: 'delete', path: 'a.ts' } }), t))
+    expect(cardTitle(card({ kind: 'change', title: { copy: 'change', op: 'delete', path: 'a.ts' } }), t, AS_RECORDED))
       .toBe('a.ts deleted')
   })
 
+  it('shows a recorded absolute path relative to the project root', () => {
+    expect(cardTitle(
+      card({ kind: 'change', title: { copy: 'change', op: 'update', path: '/proj/src/a.ts' } }),
+      t,
+      IN_PROJECT,
+    )).toBe('src/a.ts modified')
+  })
+
   it('names a passing command', () => {
-    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyPassed', command: 'go test' } }), t))
+    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyPassed', command: 'go test' } }), t, AS_RECORDED))
       .toBe('go test passed')
   })
 
   it('names a failing command with and without a recorded code', () => {
-    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyFailed', command: 'go test', errorCode: 'E1' } }), t))
-      .toBe('go test failed: E1')
-    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyFailed', command: 'go test' } }), t))
+    expect(cardTitle(
+      card({ kind: 'verify', title: { copy: 'verifyFailed', command: 'go test', errorCode: 'E1' } }),
+      t,
+      AS_RECORDED,
+    )).toBe('go test failed: E1')
+    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyFailed', command: 'go test' } }), t, AS_RECORDED))
       .toBe('go test failed')
   })
 
   it('names a folded verification run and the closing summary', () => {
-    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyRun', count: 3 } }), t))
+    expect(cardTitle(card({ kind: 'verify', title: { copy: 'verifyRun', count: 3 } }), t, AS_RECORDED))
       .toBe('3 verifications, all passed')
-    expect(cardTitle(card({ kind: 'result', title: { copy: 'result', files: 2, verifications: 5 } }), t))
+    expect(cardTitle(card({ kind: 'result', title: { copy: 'result', files: 2, verifications: 5 } }), t, AS_RECORDED))
       .toBe('2 files changed, 5 verifications')
   })
 })
@@ -255,7 +274,7 @@ describe('detailRows', () => {
       kind: 'change',
       title: { copy: 'change', op: 'update', path: 'src/a.ts' },
       meta: { path: 'src/a.ts', command: 'go test', tool: 'edit', op: 'update', files: 2, searches: 3 },
-    }), t)
+    }), t, AS_RECORDED)
     expect(rows).toEqual([
       { label: 'Path', value: 'src/a.ts', file: 'src/a.ts' },
       { label: 'Command', value: 'go test' },
@@ -266,23 +285,34 @@ describe('detailRows', () => {
     ])
   })
 
+  it('shows the path relative to the project root but keeps the recorded one for opening', () => {
+    expect(detailRows(card({
+      kind: 'change',
+      title: { copy: 'change', op: 'update', path: '/proj/src/a.ts' },
+      meta: { path: '/proj/src/a.ts' },
+    }), t, IN_PROJECT)).toEqual([{ label: 'Path', value: 'src/a.ts', file: '/proj/src/a.ts' }])
+  })
+
   it('lists the recorded prompt and the thinking behind an intent', () => {
     expect(detailRows(card({
       kind: 'prompt',
       title: { copy: 'prompt', text: 'fix the login redirect' },
       meta: { prompt: 'fix the login redirect, and keep the tests green' },
-    }), t)).toEqual([{ label: 'Prompt text', value: 'fix the login redirect, and keep the tests green' }])
+    }), t, AS_RECORDED)).toEqual([{ label: 'Prompt text', value: 'fix the login redirect, and keep the tests green' }])
 
     expect(detailRows(card({
       kind: 'intent',
       title: { copy: 'intent', text: 'check the router' },
       meta: { thinking: 'start with the router, then the form' },
-    }), t)).toEqual([{ label: 'Thinking', value: 'start with the router, then the form' }])
+    }), t, AS_RECORDED)).toEqual([{ label: 'Thinking', value: 'start with the router, then the form' }])
   })
 
   it('shows an unrecognized operation verbatim', () => {
-    expect(detailRows(card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' }, meta: { op: 'rename' } }), t))
-      .toEqual([{ label: 'Operation', value: 'rename' }])
+    expect(detailRows(
+      card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' }, meta: { op: 'rename' } }),
+      t,
+      AS_RECORDED,
+    )).toEqual([{ label: 'Operation', value: 'rename' }])
   })
 
   it('omits zero counts and non-string facts', () => {
@@ -290,11 +320,15 @@ describe('detailRows', () => {
       kind: 'recon',
       title: { copy: 'recon', files: 0, searches: 0 },
       meta: { files: 0, searches: 0, tool: 7 },
-    }), t)).toEqual([])
+    }), t, AS_RECORDED)).toEqual([])
   })
 
   it('reports nothing for a card without facts', () => {
-    expect(detailRows(card({ kind: 'result', title: { copy: 'result', files: 0, verifications: 0 } }), t)).toEqual([])
+    expect(detailRows(
+      card({ kind: 'result', title: { copy: 'result', files: 0, verifications: 0 } }),
+      t,
+      AS_RECORDED,
+    )).toEqual([])
   })
 })
 
@@ -352,12 +386,22 @@ describe('recorded diffs', () => {
   const DIFF = { path: 'src/a.ts', oldText: 'const a = 1', newText: 'const a = 2' }
 
   it('hands a card’s recorded diffs to the diff block', () => {
-    expect(cardDiffs(card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, diffs: [DIFF] })))
-      .toEqual([DIFF])
+    expect(cardDiffs(
+      card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, diffs: [DIFF] }),
+      AS_RECORDED,
+    )).toEqual([DIFF])
+  })
+
+  it('shortens each hunk header the way the view reads paths', () => {
+    const absolute = { path: '/proj/src/a.ts', oldText: 'a', newText: 'b' }
+    expect(cardDiffs(
+      card({ kind: 'change', title: { copy: 'change', op: 'update', path: '/proj/src/a.ts' }, diffs: [absolute] }),
+      IN_PROJECT,
+    )).toEqual([{ ...absolute, path: 'src/a.ts' }])
   })
 
   it('reports no diffs for a card that records none', () => {
-    expect(cardDiffs(card({ kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }))).toEqual([])
+    expect(cardDiffs(card({ kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }), AS_RECORDED)).toEqual([])
   })
 
   it('localizes the diff card chrome from the shared vocabulary', () => {

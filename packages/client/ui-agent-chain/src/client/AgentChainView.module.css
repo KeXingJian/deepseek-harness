@@ -88,17 +88,57 @@
   list-style: none;
 }
 
+/* 一行卡片。类别只由字形和类别底色区分；状态与风险仍由圆点、标题色和标签
+   表示，因此下面的每种底色都不承载健康含义。 */
 .card {
+  position: relative;
   box-sizing: border-box;
   min-width: 0;
   padding: 6px 8px;
   border-radius: var(--dsw-radius-md);
 }
 
+/* 悬停只叠一层透明墨色，卡片自己的底色在每种类别里保留。 */
 @media (hover: hover) {
   .card:hover {
-    background: var(--dsw-alias-interactive-bg-hover);
+    background-image: linear-gradient(
+      var(--dsw-alias-interactive-bg-hover),
+      var(--dsw-alias-interactive-bg-hover)
+    );
   }
+}
+
+/* 提示词是人对这条链说的唯一一句话，因此单独成块并用竖线标出说话人。 */
+.card[data-kind='prompt'] {
+  padding-left: 14px;
+  background-color: var(--dsw-alias-bg-module-platform);
+}
+
+.card[data-kind='prompt']::before {
+  content: '';
+  position: absolute;
+  inset-block: 6px;
+  inset-inline-start: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--dsw-alias-state-business-primary);
+}
+
+/* 改动是评审要读的产物，用描边把这一行从流水线里提出一层。 */
+.card[data-kind='change'] {
+  box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l2);
+}
+
+/* 交接给人时链会停在这里，等待的注意力成本由底色提示。 */
+.card[data-kind='interrupt'] {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent);
+}
+
+/* 收尾行属另一段，用分隔线断开并加上行距。 */
+.card[data-kind='result'] {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .head {
@@ -108,8 +148,57 @@
   gap: 8px;
 }
 
+/* 类别标签：字形加类别名，底色由卡片类别决定。 */
 .kind {
+  display: inline-flex;
   flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  corner-shape: round;
+  color: var(--dsw-alias-label-secondary);
+  background-color: var(--dsw-alias-bg-module-platform);
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.card[data-kind='prompt'] .kind {
+  color: var(--dsw-alias-state-business-primary);
+  background-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);
+}
+
+/* 推理是最安静的一段，不占底色。 */
+.card[data-kind='thinking'] .kind {
+  color: var(--dsw-alias-label-tertiary);
+  background-color: transparent;
+}
+
+.card[data-kind='intent'] .kind {
+  color: var(--dsw-alias-state-done-primary);
+  background-color: color-mix(in srgb, var(--dsw-alias-state-done-primary) 10%, transparent);
+}
+
+.card[data-kind='recon'] .kind {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.card[data-kind='change'] .kind {
+  color: var(--dsw-alias-label-primary);
+}
+
+.card[data-kind='interrupt'] .kind {
+  color: var(--dsw-alias-state-warn-label);
+  background-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent);
+}
+
+/* 结果是收尾的汇总，用描边而不是底色，读起来是这一段的结论。 */
+.card[data-kind='result'] .kind {
+  color: var(--dsw-alias-label-primary);
+  background-color: transparent;
+  box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l4);
 }
 
 .title {
@@ -118,6 +207,17 @@
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xs-13);
+}
+
+/* 人的原话和收尾结论比叙述更重，其余类别保持同一字重。 */
+.card[data-kind='prompt'] .title,
+.card[data-kind='result'] .title {
+  font: var(--dsw-font-xs-strong-13);
+}
+
+/* 探查是背景工作，标题降到次级墨色；状态色仍覆盖它。 */
+.card[data-kind='recon'] .title {
+  color: var(--dsw-alias-label-secondary);
 }
 
 .card[data-status='error'] .title {
@@ -134,9 +234,11 @@
   font: var(--dsw-font-xxs-12);
 }
 
+/* 行动计数对齐类别标签，读作这段思考的下一行。 */
 .actions {
   min-width: 0;
   margin-top: 2px;
+  padding-left: 18px;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxs-12);
@@ -173,10 +275,10 @@
   display: flex;
   flex-direction: column;
   margin: 2px 0 0;
-  padding: 0 0 0 10px;
+  padding: 0 0 0 18px;
   gap: 2px;
   list-style: none;
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 /* 改动卡片的差异块：与展开事实同属二级内容，宽度受卡片约束。 */
@@ -197,7 +299,7 @@
   flex-direction: column;
   box-sizing: border-box;
   min-width: 0;
-  padding: 4px 0 2px 42px;
+  padding: 4px 0 2px 18px;
   gap: 6px;
 }
 
@@ -282,6 +384,9 @@
 
 /* 文件行会在会话旁打开预览，而不是作为纯文本呈现。 */
 .fileLink {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
   padding: 0;
   border: 0;
   border-radius: var(--dsw-radius-sm);
@@ -315,8 +420,13 @@
     padding: 12px 12px 20px;
   }
 
-  .detail {
+  .detail,
+  .actions {
     padding-left: 0;
+  }
+
+  .children {
+    padding-left: 12px;
   }
 }
 

@@ -3,12 +3,17 @@
  * 可提供的展开行。
  */
 
+import type { ComponentType } from 'react'
 import type {
   ActivitySpan, ChangeOp, ChainActions, ChainCard, ChainKind, ChainStatus, ChainTitle, RiskFlag, RiskReason,
   RiskSeverity,
 } from '@deepseek-ai/dsh-agent-activity'
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
-import type { DiffBlockLabels, DiffHunk, StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { DiffBlockLabels, DiffHunk, IconProps, StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconCheckCircleOutlineRegular, IconChecklistOutlineRegular, IconEditOutlineRegular, IconPlanOutlineRegular,
+  IconQuestionOutlineRegular, IconSearchOutlineRegular, IconThinkOutlineRegular, IconUserOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { AgentChainKey } from './locales.ts'
 
@@ -37,16 +42,16 @@ export const KIND_KEYS: Readonly<Record<ChainKind, AgentChainKey>> = {
   result: 'kind.result',
 }
 
-/** 一种卡片类型的标签配色；失败和警告仍由状态圆点表示。 */
-export const KIND_TONES: Readonly<Record<ChainKind, TagTone>> = {
-  prompt: 'quiet',
-  thinking: 'quiet',
-  intent: 'info',
-  recon: 'quiet',
-  change: 'neutral',
-  verify: 'outline',
-  interrupt: 'warning',
-  result: 'outline',
+/** 一种卡片类型的字形；读者按图形分辨卡片类别，颜色留给状态与风险。 */
+export const KIND_GLYPHS: Readonly<Record<ChainKind, ComponentType<IconProps>>> = {
+  prompt: IconUserOutlineRegular,
+  thinking: IconThinkOutlineRegular,
+  intent: IconPlanOutlineRegular,
+  recon: IconSearchOutlineRegular,
+  change: IconEditOutlineRegular,
+  verify: IconChecklistOutlineRegular,
+  interrupt: IconQuestionOutlineRegular,
+  result: IconCheckCircleOutlineRegular,
 }
 
 /** 一种风险严重程度的标签配色。 */
@@ -96,12 +101,22 @@ export interface ChainEvidenceSpan {
 export type ChainTranslate = (key: AgentChainKey | CommonKey, params?: Record<string, unknown>) => string
 
 /**
+ * 把记录时的工作区路径改写为读者看到的文本。
+ *
+ * 记录值是工具拿到的原样路径，可能带整条工作区根目录；展示层只显示相对于项目
+ * 根的路径，工作区根目录未知时原样返回。打开文件仍用记录值，因此这个改写只影响
+ * 文本。
+ */
+export type ChainPathLabel = (path: string) => string
+
+/**
  * 组合一张卡片记录的差异块，供 `DiffBlock` 渲染。
  * @param card - 链上的卡片。
+ * @param label - 把差异块的文件路径改写为展示文本。
  * @returns 差异块；卡片没有记录差异时为空数组。
  */
-export function cardDiffs(card: ChainCard): DiffHunk[] {
-  return card.diffs === undefined ? [] : [...card.diffs]
+export function cardDiffs(card: ChainCard, label: ChainPathLabel): DiffHunk[] {
+  return card.diffs === undefined ? [] : card.diffs.map(diff => ({ ...diff, path: label(diff.path) }))
 }
 
 /**
@@ -150,10 +165,11 @@ function reconText(files: number, searches: number, t: ChainTranslate): string {
  * 用读者的语言组合单张卡片的标题。
  * @param card - 要渲染的卡片。
  * @param t - 评审链翻译器。
+ * @param label - 把卡片里的文件路径改写为展示文本。
  * @returns 标题文本；prompt、thinking 与 intent 卡片会原样返回记录下来的措辞。
  */
-export function cardTitle(card: ChainCard, t: ChainTranslate): string {
-  return titleText(card.title, t)
+export function cardTitle(card: ChainCard, t: ChainTranslate, label: ChainPathLabel): string {
+  return titleText(card.title, t, label)
 }
 
 /**
@@ -172,7 +188,7 @@ export function actionSummary(actions: ChainActions, t: ChainTranslate): string 
 }
 
 /** 组合一条消息描述符的标题。 */
-function titleText(title: ChainTitle, t: ChainTranslate): string {
+function titleText(title: ChainTitle, t: ChainTranslate, label: ChainPathLabel): string {
   switch (title.copy) {
     case 'prompt':
     case 'thinking':
@@ -191,7 +207,7 @@ function titleText(title: ChainTitle, t: ChainTranslate): string {
     case 'interrupt':
       return t('title.interrupt', { seconds: title.seconds })
     case 'change':
-      return t(CHANGE_TITLE_KEYS[title.op], { path: title.path })
+      return t(CHANGE_TITLE_KEYS[title.op], { path: label(title.path) })
     case 'verifyPassed':
       return t('title.verifyPassed', { command: title.command })
     case 'verifyFailed':
@@ -329,16 +345,17 @@ function metaCount(meta: ChainCard['meta'], key: string): string | undefined {
  * 已有的内容，但读者展开卡片是在核对记录，而不是快速浏览。
  * @param card - 正在展开的卡片。
  * @param t - 评审链翻译器。
+ * @param label - 把卡片里的文件路径改写为展示文本。
  * @returns 按固定字段顺序排列的行；卡片没有记录任何内容时为空。
  */
-export function detailRows(card: ChainCard, t: ChainTranslate): readonly ChainDetailRow[] {
+export function detailRows(card: ChainCard, t: ChainTranslate, label: ChainPathLabel): readonly ChainDetailRow[] {
   const rows: ChainDetailRow[] = []
   const prompt = metaString(card.meta, 'prompt')
   if (prompt !== undefined) rows.push({ label: t('meta.prompt'), value: prompt })
   const thinking = metaString(card.meta, 'thinking')
   if (thinking !== undefined) rows.push({ label: t('meta.thinking'), value: thinking })
   const path = metaString(card.meta, 'path')
-  if (path !== undefined) rows.push({ label: t('meta.path'), value: path, file: path })
+  if (path !== undefined) rows.push({ label: t('meta.path'), value: label(path), file: path })
   const command = metaString(card.meta, 'command')
   if (command !== undefined) rows.push({ label: t('meta.command'), value: command })
   const tool = metaString(card.meta, 'tool')

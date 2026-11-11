@@ -6,11 +6,17 @@
 
 import { Fragment, useMemo, useState } from 'react'
 import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
-import { DiffBlock, IconChevronDownOutlineRegular, Pill, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChainSnapshot } from './chain-view.ts'
-import type { ChainEvidenceSpan, ChainFilter, ChainTranslate } from './chain-copy.ts'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import {
-  CHAIN_FILTERS, FILTER_KEYS, KIND_KEYS, KIND_TONES, SEVERITY_KEYS, SEVERITY_TONES,
+  DiffBlock, IconChevronDownOutlineRegular, Pill, StateDot, Tag,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
+import type { ChainSnapshot } from './chain-view.ts'
+import type { ChainEvidenceSpan, ChainFilter, ChainPathLabel, ChainTranslate } from './chain-copy.ts'
+import {
+  CHAIN_FILTERS, FILTER_KEYS, KIND_GLYPHS, KIND_KEYS, SEVERITY_KEYS, SEVERITY_TONES,
   actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, isExpandable, riskReason,
   statusDot,
 } from './chain-copy.ts'
@@ -21,6 +27,10 @@ const DIFF_MAX_LINES = 12
 
 /** 由会话视图 slot 绑定的 props。 */
 export interface AgentChainViewProps {
+  /** 屏幕上 Session 的身份；卡片路径相对它的工作区根目录展示。 */
+  readonly sessionId: SessionId
+  /** 框架提供的会话列表读口，用来取得该 Session 的工作区根目录。 */
+  readonly useSessions: SnapshotSelectorHook<SessionListState>
   /** 屏幕上 Session 的最新链快照。 */
   readonly useChain: <S>(selector: (snapshot: ChainSnapshot) => S) => S
   /** 翻译一个评审链键。 */
@@ -31,9 +41,17 @@ export interface AgentChainViewProps {
   readonly inspectCall: ((callId: string) => void) | undefined
 }
 
-/** 一个文件名，点击后可在会话旁打开其内容。 */
-function FileButton({ path, openFile, t }: {
+/**
+ * 一个文件，点击后可在会话旁打开其内容。
+ * @param props.path - 记录时的工作区路径，打开文件用它。
+ * @param props.label - 相对项目根的展示文本。
+ * @param props.openFile - 在 Sidebar 预览中打开文件。
+ * @param props.t - 评审链翻译器。
+ * @returns 显示相对路径的文件按钮。
+ */
+function FileButton({ path, label, openFile, t }: {
   path: string
+  label: string
   openFile: AgentChainViewProps['openFile']
   t: AgentChainViewProps['t']
 }) {
@@ -41,10 +59,11 @@ function FileButton({ path, openFile, t }: {
     <button
       type="button"
       className={css.fileLink}
-      aria-label={`${t('card.openFile')} ${path}`}
+      aria-label={`${t('card.openFile')} ${label}`}
+      title={label === path ? undefined : path}
       onClick={() => { openFile(path) }}
     >
-      {path}
+      {label}
     </button>
   )
 }
@@ -82,28 +101,33 @@ function EvidenceRow({ span, inspectCall, t }: {
 }
 
 /** 一行卡片，拥有自己的展开状态；思考卡片的行动子卡在此递归渲染。 */
-function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, t }: {
+function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, label, t }: {
   card: ChainCard
   spans: ChainSnapshot['spans']
   expanded: readonly string[]
   onToggle: (id: string) => void
   openFile: AgentChainViewProps['openFile']
   inspectCall: AgentChainViewProps['inspectCall']
+  label: ChainPathLabel
   t: AgentChainViewProps['t']
 }) {
-  const rows = detailRows(card, t)
-  const diffs = cardDiffs(card)
+  const rows = detailRows(card, t, label)
+  const diffs = cardDiffs(card, label)
   const expandable = isExpandable(card, rows)
   const open = expanded.includes(card.id)
   const labels = useMemo(() => diffLabels(t), [t])
   // 折叠的卡片保持低开销：只有展开的卡片才会执行 span 查找。
   const evidence = open ? evidenceSpans(card, spans) : []
+  const Glyph = KIND_GLYPHS[card.kind]
   return (
     <li className={css.card} data-kind={card.kind} data-status={card.status}>
       <div className={css.head}>
         <StateDot state={statusDot(card.status)} />
-        <Tag tone={KIND_TONES[card.kind]} className={css.kind}>{t(KIND_KEYS[card.kind])}</Tag>
-        <span className={css.title}>{cardTitle(card, t)}</span>
+        <span className={css.kind}>
+          <Glyph size={12} />
+          {t(KIND_KEYS[card.kind])}
+        </span>
+        <span className={css.title}>{cardTitle(card, t, label)}</span>
         {card.repeat !== undefined && <span className={css.repeat}>{`×${String(card.repeat)}`}</span>}
         {expandable && (
           <button
@@ -133,7 +157,7 @@ function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, 
                   <dd className={css.metaValue}>
                     {row.file === undefined
                       ? row.value
-                      : <FileButton path={row.file} openFile={openFile} t={t} />}
+                      : <FileButton path={row.file} label={label(row.file)} openFile={openFile} t={t} />}
                   </dd>
                 </Fragment>
               ))}
@@ -162,6 +186,7 @@ function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, 
               onToggle={onToggle}
               openFile={openFile}
               inspectCall={inspectCall}
+              label={label}
               t={t}
             />
           ))}
@@ -176,8 +201,10 @@ function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, 
  * @param props - 绑定的快照 hook、翻译器、文件打开器和调用查看器。
  * @returns 链视图、筛选器和风险横幅，或空状态提示。
  */
-export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChainViewProps) {
+export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, inspectCall }: AgentChainViewProps) {
   const chain = useChain(snapshot => snapshot)
+  const cwd = useSessions(state => state.byId[sessionId]?.cwd)
+  const label = useMemo<ChainPathLabel>(() => path => relativizeToCwd(path, cwd), [cwd])
   const [filter, setFilter] = useState<ChainFilter>('all')
   const [expanded, setExpanded] = useState<readonly string[]>([])
   if (chain.cards.length === 0) return <p className={css.empty}>{t('empty.waiting')}</p>
@@ -200,7 +227,7 @@ export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChai
                 {flag.evidenceFiles.length > 0 && (
                   <span className={css.riskFiles}>
                     {flag.evidenceFiles.map(path => (
-                      <FileButton key={path} path={path} openFile={openFile} t={t} />
+                      <FileButton key={path} path={path} label={label(path)} openFile={openFile} t={t} />
                     ))}
                   </span>
                 )}
@@ -229,6 +256,7 @@ export function AgentChainView({ useChain, t, openFile, inspectCall }: AgentChai
                 onToggle={toggle}
                 openFile={openFile}
                 inspectCall={inspectCall}
+                label={label}
                 t={t}
               />
             ))}
