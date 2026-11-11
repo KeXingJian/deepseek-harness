@@ -9,6 +9,8 @@ export const NS = 'agentChain'
 export const en = {
   'view.chain': 'Chain',
   'banner.risks': 'Review risks',
+  'banner.show': 'Show risks',
+  'banner.hide': 'Hide risks',
   'empty.waiting': 'No activity recorded yet',
   'empty.filtered': 'Nothing matches this filter',
   'card.evidence': 'Evidence',
@@ -79,6 +81,8 @@ export const en = {
 export const zh = {
   'view.chain': '执行链',
   'banner.risks': '评审风险',
+  'banner.show': '展开风险',
+  'banner.hide': '收起风险',
   'empty.waiting': '还没有记录到活动',
   'empty.filtered': '当前筛选下没有内容',
   'card.evidence': '依据',
@@ -149,6 +153,8 @@ export const zh = {
 export const ja = {
   'view.chain': '実行チェーン',
   'banner.risks': 'レビュー上のリスク',
+  'banner.show': 'リスクを表示',
+  'banner.hide': 'リスクを隠す',
   'empty.waiting': 'まだアクティビティがありません',
   'empty.filtered': 'この絞り込みに一致する項目はありません',
   'card.evidence': '根拠',
@@ -219,6 +225,8 @@ export const ja = {
 export const es = {
   'view.chain': 'Cadena',
   'banner.risks': 'Riesgos de revisión',
+  'banner.show': 'Mostrar riesgos',
+  'banner.hide': 'Ocultar riesgos',
   'empty.waiting': 'Aún no hay actividad registrada',
   'empty.filtered': 'Nada coincide con este filtro',
   'card.evidence': 'Evidencia',
@@ -289,6 +297,8 @@ export const es = {
 export const fr = {
   'view.chain': 'Chaîne',
   'banner.risks': 'Risques de revue',
+  'banner.show': 'Afficher les risques',
+  'banner.hide': 'Masquer les risques',
   'empty.waiting': 'Aucune activité enregistrée pour l’instant',
   'empty.filtered': 'Aucun élément ne correspond à ce filtre',
   'card.evidence': 'Preuves',
@@ -359,6 +369,8 @@ export const fr = {
 export const de = {
   'view.chain': 'Kette',
   'banner.risks': 'Review-Risiken',
+  'banner.show': 'Risiken anzeigen',
+  'banner.hide': 'Risiken ausblenden',
   'empty.waiting': 'Noch keine Aktivität aufgezeichnet',
   'empty.filtered': 'Kein Eintrag passt zu diesem Filter',
   'card.evidence': 'Belege',
@@ -429,6 +441,8 @@ export const de = {
 export const ru = {
   'view.chain': 'Цепочка',
   'banner.risks': 'Риски ревью',
+  'banner.show': 'Показать риски',
+  'banner.hide': 'Скрыть риски',
   'empty.waiting': 'Активность ещё не записана',
   'empty.filtered': 'Ничего не соответствует этому фильтру',
   'card.evidence': 'Основания',
@@ -499,6 +513,8 @@ export const ru = {
 export const pt = {
   'view.chain': 'Cadeia',
   'banner.risks': 'Riscos de revisão',
+  'banner.show': 'Mostrar riscos',
+  'banner.hide': 'Ocultar riscos',
   'empty.waiting': 'Nenhuma atividade registrada ainda',
   'empty.filtered': 'Nada corresponde a este filtro',
   'card.evidence': 'Evidências',

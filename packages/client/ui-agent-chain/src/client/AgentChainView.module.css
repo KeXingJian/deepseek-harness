@@ -3,16 +3,49 @@
    转录的宽度。 */
 
 .root {
+  --chain-rail-width: 200px;
+  --chain-gap: 12px;
+  /* 卡片区宽度由这里查询：视图拿到的是会话列的宽度，而不是窗口宽度。 */
+  container-type: inline-size;
   display: flex;
-  flex-direction: column;
   box-sizing: border-box;
+  flex-direction: column;
   width: 100%;
   min-width: 0;
-  max-width: var(--dsh-chat-content-width, 920px);
+  /* 卡片列保持与聊天列同宽：风险栏与行内边距占用列宽之外的空间，
+     窄屏时 width: 100% 先收回，不撑破会话列。 */
+  max-width: min(
+    100%,
+    calc(var(--dsh-chat-content-width, 920px) + var(--chain-rail-width) + var(--chain-gap) + 24px)
+  );
   margin: 0 auto;
-  padding: 16px 24px 24px;
-  gap: 12px;
+  padding: 16px 12px 24px;
   color: var(--dsw-alias-label-primary);
+}
+
+/* 风险栏在左侧，卡片流在右侧；没有风险时卡片流占满整行。 */
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  min-width: 0;
+  gap: var(--chain-gap);
+}
+
+.board[data-risks='open'] {
+  grid-template-columns: var(--chain-rail-width) minmax(0, 1fr);
+}
+
+/* 收起后只剩一条窄把手，卡片流跟着让出宽度。 */
+.board[data-risks='closed'] {
+  grid-template-columns: 24px minmax(0, 1fr);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
 }
 
 .filters {
@@ -22,25 +55,104 @@
   gap: 6px;
 }
 
+/* 风险栏：粘在滚动容器上沿，卡片流滚动时评审者仍能读到风险。 */
 .risks {
+  position: sticky;
+  top: 8px;
+  display: flex;
   box-sizing: border-box;
+  flex-direction: column;
   min-width: 0;
   padding: 8px 10px;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-2);
+  gap: 4px;
 }
 
 .risksHead {
   display: flex;
   align-items: center;
-  gap: 6px;
   min-width: 0;
+  gap: 4px;
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxs-12);
 }
 
+/* 风险栏本身是警示面，用警告墨色而非正文墨色领头。 */
+.risksGlyph {
+  flex: none;
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.risksTitle {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.risksToggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-xs);
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .risksToggle:hover {
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.risksToggle:focus-visible {
+  outline-offset: 1px;
+}
+
+/* 收起状态只剩一条竖排把手，点击即展开；宽度与收起列一致。 */
+.risksHandle {
+  position: sticky;
+  top: 8px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-self: start;
+  box-sizing: border-box;
+  width: 24px;
+  padding: 6px 0;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent);
+  border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-state-warn-label);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent);
+  gap: 4px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .risksHandle:hover {
+    background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 14%, transparent);
+  }
+}
+
+.risksHandle:focus-visible {
+  outline-offset: 1px;
+}
+
+.risksHandleCount {
+  color: inherit;
+  font: var(--dsw-font-xxs-12);
+}
+
 .riskCount {
+  flex: none;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxs-12);
 }
@@ -48,7 +160,7 @@
 .riskList {
   display: flex;
   flex-direction: column;
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   gap: 6px;
   list-style: none;
@@ -63,20 +175,46 @@
   font: var(--dsw-font-xs-13);
 }
 
+/* 高危项左侧加一道色条，纵向扫读时先看到阻断项。 */
+.riskItem[data-severity='danger'] {
+  padding-left: 6px;
+  box-shadow: inset 2px 0 0 var(--dsw-alias-state-error-primary);
+}
+
 .riskReason {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
 }
 
 .riskFiles {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   min-width: 0;
-  gap: 0 8px;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxs-12);
+}
+
+/* 视图列变窄时风险栏回到列表上方，横向空间留给卡片。 */
+@container (max-width: 800px) {
+  .board[data-risks='open'],
+  .board[data-risks='closed'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .risks,
+  .risksHandle {
+    position: static;
+  }
+
+  .risksHandle {
+    flex-direction: row;
+    width: auto;
+    justify-self: start;
+    padding: 4px 8px;
+  }
 }
 
 .cards {
@@ -84,18 +222,35 @@
   flex-direction: column;
   margin: 0;
   padding: 0;
-  gap: 2px;
+  gap: 4px;
   list-style: none;
 }
 
-/* 一行卡片。类别只由字形和类别底色区分；状态与风险仍由圆点、标题色和标签
-   表示，因此下面的每种底色都不承载健康含义。 */
+/* 一行卡片。类别由四层同时区分：左侧色条、底色、类别标签墨色与字形。
+   色条按作用域着色——人的话（蓝）、推理（紫）、勘察（灰）、需要人关注（琥珀）、
+   验证（绿）、结论（墨）——而不是逐类换色，因此同一作用域读起来是一家人。
+   状态与风险仍由圆点、标题色和标签表示，色条不承载健康含义。 */
 .card {
+  --card-accent: var(--dsw-alias-label-tertiary);
+  --card-tint: 4%;
   position: relative;
   box-sizing: border-box;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 12px;
   border-radius: var(--dsw-radius-md);
+  background-color: color-mix(in srgb, var(--card-accent) var(--card-tint), transparent);
+}
+
+/* 色条本身；`inset-block` 留下圆角呼吸位，读起来是一条轨道而不是贴边的边框。 */
+.card::before {
+  content: '';
+  position: absolute;
+  inset-block: 5px;
+  inset-inline-start: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--card-accent);
+  opacity: 0.8;
 }
 
 /* 悬停只叠一层透明墨色，卡片自己的底色在每种类别里保留。 */
@@ -108,37 +263,91 @@
   }
 }
 
-/* 提示词是人对这条链说的唯一一句话，因此单独成块并用竖线标出说话人。 */
+/* 提示词是人对这条链说的唯一一句话：作用域色最饱和，整块填充并加粗标题。 */
 .card[data-kind='prompt'] {
-  padding-left: 14px;
-  background-color: var(--dsw-alias-bg-module-platform);
+  --card-accent: var(--dsw-alias-state-business-primary);
+  --card-tint: 8%;
+  padding: 8px 10px 8px 14px;
 }
 
 .card[data-kind='prompt']::before {
-  content: '';
-  position: absolute;
-  inset-block: 6px;
+  inset-block: 8px;
   inset-inline-start: 6px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--dsw-alias-state-business-primary);
+  opacity: 1;
 }
 
-/* 改动是评审要读的产物，用描边把这一行从流水线里提出一层。 */
+/* 推理是一段连续的内心活动：思考与意图同色，思考用虚线段读作背景。 */
+.card[data-kind='thinking'] {
+  --card-accent: var(--dsw-alias-state-done-primary);
+  --card-tint: 3%;
+}
+
+.card[data-kind='thinking']::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--card-accent) 0 3px,
+    transparent 3px 6px
+  );
+  opacity: 0.6;
+}
+
+.card[data-kind='intent'] {
+  --card-accent: var(--dsw-alias-state-done-primary);
+  --card-tint: 7%;
+}
+
+/* 勘察是背景工作，压低到灰阶，标题也退到次级墨色。 */
+.card[data-kind='recon'] {
+  --card-accent: var(--dsw-alias-label-tertiary);
+  --card-tint: 4%;
+}
+
+.card[data-kind='recon']::before {
+  opacity: 0.55;
+}
+
+/* 改动是评审要读的产物：琥珀色条加描边，把这一行从流水线里提出一层。 */
 .card[data-kind='change'] {
+  --card-accent: var(--dsw-alias-state-warn-primary);
+  --card-tint: 6%;
   box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l2);
 }
 
-/* 交接给人时链会停在这里，等待的注意力成本由底色提示。 */
-.card[data-kind='interrupt'] {
-  background-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent);
+/* 验证给出的是健康信号，绿色与状态圆点同族。 */
+.card[data-kind='verify'] {
+  --card-accent: var(--dsw-alias-state-success-primary);
+  --card-tint: 6%;
 }
 
-/* 收尾行属另一段，用分隔线断开并加上行距。 */
+/* 交接给人时链会停在这里；与改动同属"需要人关注"，改用整块底色而不带色条。 */
+.card[data-kind='interrupt'] {
+  --card-accent: var(--dsw-alias-state-warn-primary);
+  --card-tint: 12%;
+  padding-inline-start: 8px;
+}
+
+.card[data-kind='interrupt']::before {
+  content: none;
+}
+
+/* 收尾行属另一段，用分隔线断开并加上行距，色条让位给分隔线。 */
 .card[data-kind='result'] {
+  --card-accent: var(--dsw-alias-label-primary);
+  --card-tint: 0%;
   margin-top: 6px;
   padding-top: 10px;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.card[data-kind='result']::before {
+  content: none;
+}
+
+/* 失败的卡片用错误色压过作用域色：一次没通过的验证、一次删错的文件，
+   读到的第一眼必须是失败，而不是它属于哪一段。 */
+.card[data-status='error'] {
+  --card-accent: var(--dsw-alias-state-error-primary);
+  --card-tint: 6%;
 }
 
 .head {
@@ -148,7 +357,9 @@
   gap: 8px;
 }
 
-/* 类别标签：字形加类别名，底色由卡片类别决定。 */
+/* 类别标签：字形加类别名，墨色与底色跟随该行的作用域色。
+   墨色把作用域色与正文墨色各掺一半：纯作用域色（尤其琥珀与绿）在浅色底上
+   对比度不足，掺入正文墨色后两种主题都读得清。 */
 .kind {
   display: inline-flex;
   flex: none;
@@ -157,44 +368,27 @@
   padding: 1px 8px 1px 6px;
   border-radius: 999px;
   corner-shape: round;
-  color: var(--dsw-alias-label-secondary);
-  background-color: var(--dsw-alias-bg-module-platform);
+  color: color-mix(in srgb, var(--card-accent) 55%, var(--dsw-alias-label-primary));
+  background-color: color-mix(in srgb, var(--card-accent) 12%, transparent);
   font-size: 11px;
   line-height: 17px;
   font-weight: 500;
   white-space: nowrap;
 }
 
-.card[data-kind='prompt'] .kind {
-  color: var(--dsw-alias-state-business-primary);
-  background-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);
-}
-
-/* 推理是最安静的一段，不占底色。 */
+/* 推理是最安静的一段：标签只留字形与次级墨色，不占底色。 */
 .card[data-kind='thinking'] .kind {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   background-color: transparent;
 }
 
-.card[data-kind='intent'] .kind {
-  color: var(--dsw-alias-state-done-primary);
-  background-color: color-mix(in srgb, var(--dsw-alias-state-done-primary) 10%, transparent);
-}
-
+/* 勘察同为背景，用半透明底色把标签压到思考之下。 */
 .card[data-kind='recon'] .kind {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
+  background-color: color-mix(in srgb, var(--card-accent) 8%, transparent);
 }
 
-.card[data-kind='change'] .kind {
-  color: var(--dsw-alias-label-primary);
-}
-
-.card[data-kind='interrupt'] .kind {
-  color: var(--dsw-alias-state-warn-label);
-  background-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent);
-}
-
-/* 结果是收尾的汇总，用描边而不是底色，读起来是这一段的结论。 */
+/* 结论是收尾汇总，用描边而不是底色，读起来是这一段的结论。 */
 .card[data-kind='result'] .kind {
   color: var(--dsw-alias-label-primary);
   background-color: transparent;

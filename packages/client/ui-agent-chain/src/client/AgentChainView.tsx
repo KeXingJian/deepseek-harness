@@ -9,7 +9,8 @@ import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import {
-  DiffBlock, IconChevronDownOutlineRegular, Pill, StateDot, Tag,
+  DiffBlock, IconChevronDownOutlineRegular, IconChevronLeftOutlineRegular, IconWarningTriangleOutlineRegular,
+  Pill, StateDot, Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
@@ -199,7 +200,7 @@ function ChainCardRow({ card, spans, expanded, onToggle, openFile, inspectCall, 
 /**
  * 渲染评审执行链。
  * @param props - 绑定的快照 hook、翻译器、文件打开器和调用查看器。
- * @returns 链视图、筛选器和风险横幅，或空状态提示。
+ * @returns 左侧风险栏及其可折叠入口、筛选器和卡片列表，或空状态提示。
  */
 export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, inspectCall }: AgentChainViewProps) {
   const chain = useChain(snapshot => snapshot)
@@ -207,8 +208,10 @@ export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, 
   const label = useMemo<ChainPathLabel>(() => path => relativizeToCwd(path, cwd), [cwd])
   const [filter, setFilter] = useState<ChainFilter>('all')
   const [expanded, setExpanded] = useState<readonly string[]>([])
+  const [risksOpen, setRisksOpen] = useState(true)
   if (chain.cards.length === 0) return <p className={css.empty}>{t('empty.waiting')}</p>
   const cards = filterCards(chain.cards, filter)
+  const flags = chain.flags
   const toggle = (id: string): void => {
     setExpanded(current => (current.includes(id)
       ? current.filter(entry => entry !== id)
@@ -216,52 +219,83 @@ export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, 
   }
   return (
     <div className={css.root}>
-      {chain.flags.length > 0 && (
-        <section className={css.risks} aria-label={t('banner.risks')}>
-          <div className={css.risksHead}>{t('banner.risks')}</div>
-          <ul className={css.riskList}>
-            {chain.flags.map(flag => (
-              <li key={flag.code} className={css.riskItem}>
-                <Tag tone={SEVERITY_TONES[flag.severity]}>{t(SEVERITY_KEYS[flag.severity])}</Tag>
-                <span className={css.riskReason}>{riskReason(flag, t)}</span>
-                {flag.evidenceFiles.length > 0 && (
-                  <span className={css.riskFiles}>
-                    {flag.evidenceFiles.map(path => (
-                      <FileButton key={path} path={path} label={label(path)} openFile={openFile} t={t} />
-                    ))}
-                  </span>
-                )}
-              </li>
+      <div className={css.board} data-risks={flags.length === 0 ? 'none' : risksOpen ? 'open' : 'closed'}>
+        {flags.length > 0 && (!risksOpen
+          ? (
+            <button
+              type="button"
+              className={css.risksHandle}
+              aria-label={t('banner.show')}
+              aria-expanded={false}
+              title={t('banner.show')}
+              onClick={() => { setRisksOpen(true) }}
+            >
+              <IconWarningTriangleOutlineRegular size={12} />
+              <span className={css.risksHandleCount}>{String(flags.length)}</span>
+            </button>
+          )
+          : (
+            <aside className={css.risks} aria-label={t('banner.risks')}>
+              <div className={css.risksHead}>
+                <IconWarningTriangleOutlineRegular size={12} className={css.risksGlyph} />
+                <span className={css.risksTitle}>{t('banner.risks')}</span>
+                <span className={css.riskCount}>{String(flags.length)}</span>
+                <button
+                  type="button"
+                  className={css.risksToggle}
+                  aria-label={t('banner.hide')}
+                  aria-expanded
+                  onClick={() => { setRisksOpen(false) }}
+                >
+                  <IconChevronLeftOutlineRegular size={12} />
+                </button>
+              </div>
+              <ul className={css.riskList}>
+                {flags.map(flag => (
+                  <li key={flag.code} className={css.riskItem} data-severity={flag.severity}>
+                    <Tag tone={SEVERITY_TONES[flag.severity]}>{t(SEVERITY_KEYS[flag.severity])}</Tag>
+                    <span className={css.riskReason}>{riskReason(flag, t)}</span>
+                    {flag.evidenceFiles.length > 0 && (
+                      <span className={css.riskFiles}>
+                        {flag.evidenceFiles.map(path => (
+                          <FileButton key={path} path={path} label={label(path)} openFile={openFile} t={t} />
+                        ))}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          ))}
+        <div className={css.main}>
+          <div className={css.filters} role="group" aria-label={t('filter.aria')}>
+            {CHAIN_FILTERS.map(value => (
+              <Pill key={value} active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value) }}>
+                {t(FILTER_KEYS[value])}
+              </Pill>
             ))}
-          </ul>
-        </section>
-      )}
-      <div className={css.filters} role="group" aria-label={t('filter.aria')}>
-        {CHAIN_FILTERS.map(value => (
-          <Pill key={value} active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value) }}>
-            {t(FILTER_KEYS[value])}
-          </Pill>
-        ))}
+          </div>
+          {cards.length === 0
+            ? <p className={css.empty}>{t('empty.filtered')}</p>
+            : (
+              <ol className={css.cards}>
+                {cards.map(card => (
+                  <ChainCardRow
+                    key={card.id}
+                    card={card}
+                    spans={chain.spans}
+                    expanded={expanded}
+                    onToggle={toggle}
+                    openFile={openFile}
+                    inspectCall={inspectCall}
+                    label={label}
+                    t={t}
+                  />
+                ))}
+              </ol>
+            )}
+        </div>
       </div>
-      {cards.length === 0
-        ? <p className={css.empty}>{t('empty.filtered')}</p>
-        : (
-          <ol className={css.cards}>
-            {cards.map(card => (
-              <ChainCardRow
-                key={card.id}
-                card={card}
-                spans={chain.spans}
-                expanded={expanded}
-                onToggle={toggle}
-                openFile={openFile}
-                inspectCall={inspectCall}
-                label={label}
-                t={t}
-              />
-            ))}
-          </ol>
-        )}
     </div>
   )
 }

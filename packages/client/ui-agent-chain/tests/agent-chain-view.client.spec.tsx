@@ -330,12 +330,14 @@ describe('filters', () => {
   })
 })
 
-describe('risk banner', () => {
+describe('risk rail', () => {
+  const flags: readonly RiskFlag[] = [
+    { code: 'touches-tests', severity: 'danger', reason: { copy: 'touchesTests' }, evidenceFiles: ['tests/a.spec.ts'] },
+    { code: 'out-of-scope', severity: 'info', reason: { copy: 'outOfScope' }, evidenceFiles: [] },
+  ]
+
   it('lists each risk with its severity, reason, and files', () => {
-    renderView([change('a.ts')], [
-      { code: 'touches-tests', severity: 'danger', reason: { copy: 'touchesTests' }, evidenceFiles: ['tests/a.spec.ts'] },
-      { code: 'out-of-scope', severity: 'info', reason: { copy: 'outOfScope' }, evidenceFiles: [] },
-    ])
+    renderView([change('a.ts')], flags)
     expect(screen.getByLabelText('Review risks')).toBeTruthy()
     expect(screen.getByText('Blocker')).toBeTruthy()
     expect(screen.getByText('Changed test files')).toBeTruthy()
@@ -344,8 +346,32 @@ describe('risk banner', () => {
     expect(screen.getByText('These files appear in no task description or exploration (inferred)')).toBeTruthy()
   })
 
-  it('renders no banner without risks', () => {
+  it('renders no rail without risks', () => {
     renderView([change('a.ts')])
     expect(screen.queryByLabelText('Review risks')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Show risks' })).toBeNull()
+  })
+
+  it('collapses to a count handle and expands again on demand', () => {
+    renderView([change('a.ts')], flags)
+    const hide = screen.getByRole('button', { name: 'Hide risks' })
+    expect(hide.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(hide)
+    expect(screen.queryByLabelText('Review risks')).toBeNull()
+    expect(screen.queryByText('Changed test files')).toBeNull()
+    const show = screen.getByRole('button', { name: 'Show risks' })
+    expect(show.getAttribute('aria-expanded')).toBe('false')
+    expect(show.textContent).toBe('2')
+    fireEvent.click(show)
+    expect(screen.getByLabelText('Review risks')).toBeTruthy()
+    expect(screen.getByText('Changed test files')).toBeTruthy()
+  })
+
+  it('keeps the collapsed state independent of the card filters', () => {
+    renderView([intent('inspect the catalog module'), change('a.ts')], flags)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide risks' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Changes only' }))
+    expect(screen.getByRole('button', { name: 'Show risks' })).toBeTruthy()
+    expect(screen.getByText('a.ts modified')).toBeTruthy()
   })
 })
