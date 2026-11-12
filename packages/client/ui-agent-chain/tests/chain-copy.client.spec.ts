@@ -315,6 +315,41 @@ describe('detailRows', () => {
     ])
   })
 
+  it('labels a change note by what the projection recorded about it', () => {
+    const rows = detailRows(card({
+      kind: 'change',
+      title: { copy: 'change', op: 'update', path: 'src/a.ts' },
+      meta: { path: 'src/a.ts', note: 'auth.ts 少了空值判断', noteFrom: 'file' },
+    }), t, AS_RECORDED)
+    expect(rows).toEqual([
+      { label: 'Path', value: 'src/a.ts', file: 'src/a.ts' },
+      { label: 'Why this change', value: 'auth.ts 少了空值判断' },
+    ])
+  })
+
+  it('labels a plan and a turn goal differently from a named change', () => {
+    const plan = detailRows(card({
+      kind: 'change',
+      title: { copy: 'change', op: 'create', path: 'b.ts' },
+      meta: { note: '先看路由表', noteFrom: 'step' },
+    }), t, AS_RECORDED)
+    expect(plan).toEqual([{ label: 'Step context', value: '先看路由表' }])
+    const goal = detailRows(card({
+      kind: 'change',
+      title: { copy: 'change', op: 'create', path: 'c.ts' },
+      meta: { note: '修复排序', noteFrom: 'intent' },
+    }), t, AS_RECORDED)
+    expect(goal).toEqual([{ label: 'Turn intent', value: '修复排序' }])
+  })
+
+  it('falls back to the step label for a note without a recorded source', () => {
+    expect(detailRows(card({
+      kind: 'change',
+      title: { copy: 'change', op: 'update', path: 'd.ts' },
+      meta: { note: '改 d.ts' },
+    }), t, AS_RECORDED)).toEqual([{ label: 'Step context', value: '改 d.ts' }])
+  })
+
   it('shows the path relative to the project root but keeps the recorded one for opening', () => {
     expect(detailRows(card({
       kind: 'change',

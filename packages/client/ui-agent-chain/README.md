@@ -43,7 +43,7 @@ A locator rail on the right of the card column mirrors the top-level cards as th
 
 ### Expanding one card
 
-The disclosure button reveals what the card recorded: its named facts (the human prompt text, the step's thinking, path, command, tool, operation, file count, search count) and one row per contributing span with its session-log sequence, span name, and settlement. A change card whose tool recorded the changed text shows a line diff first — the file's before and after lines, capped, with the card's own expand control — so the reviewer reads the edit instead of a description of it. Cards without recorded facts, diffs, or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
+The disclosure button reveals what the card recorded: its named facts (the human prompt text, the step's thinking, path, the change note, command, tool, operation, file count, search count) and one row per contributing span with its session-log sequence, span name, and settlement. A change note carries its own field name, so a reader can tell a sentence that names this file (`Why this change`) from the step's plan (`Step context`) or the turn's goal (`Turn intent`). A change card whose tool recorded the changed text shows a line diff first — the file's before and after lines, capped, with the card's own expand control — so the reviewer reads the edit instead of a description of it. Cards without recorded facts, diffs, or evidence carry no disclosure button, and a cited sequence the snapshot no longer holds is skipped.
 
 ### Opening what a card names
 

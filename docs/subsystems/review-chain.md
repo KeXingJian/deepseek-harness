@@ -184,6 +184,8 @@ interface ChainDiff {
 
 A `change` card may carry `diffs`: the file's recorded before and after text, one entry per applied hunk. The projection attaches what the caller recorded rather than computing patches, and merging two edits of one file concatenates their hunks. `chainFromSpans(spans, userText?, diffs?)` takes them keyed by tool-call id, because a span records the call identity but not the file text it changed.
 
+A `change` card also carries a `note`: the recorded sentence that explains this edit, and `noteFrom` states how directly it addresses the file. `file` means the sentence names the path, its basename, or a stem of at least three characters; `step` means it is the step's first sentence and only sets the scene; `intent` means the step recorded no reasoning and the sentence is the turn's goal. Nothing is invented — a step with no reasoning under a turn with no goal leaves the card without a note, so an unexplained edit stays visibly unexplained. Merging two edits of one file keeps both notes when they differ, because one explanation rarely covers every edit.
+
 ```ts type-equiv
 /** 评审风险标记的严重程度。 */
 type RiskSeverity = 'danger' | 'warn' | 'info'

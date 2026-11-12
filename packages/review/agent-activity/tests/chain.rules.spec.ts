@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chainFromSpans } from '../src/index.ts'
-import type { ActivitySpan } from '../src/index.ts'
+import type { ActivitySpan, ChainCard } from '../src/index.ts'
 
 /** Build one span with a stable start time derived from its sequence. */
 function span(seq: number, kind: ActivitySpan['kind'], name: string, extra: Partial<ActivitySpan> = {}): ActivitySpan {
@@ -15,6 +15,13 @@ function tool(
   extra: Partial<ActivitySpan> = {},
 ): ActivitySpan {
   return span(seq, 'tool', name, { attributes, ...extra })
+}
+
+/** Every change card on the chain, flattened out of its thinking-card parent. */
+function changeCards(result: ReturnType<typeof chainFromSpans>): ChainCard[] {
+  const flatten = (cards: readonly ChainCard[]): ChainCard[] =>
+    cards.flatMap(card => [card, ...(card.children === undefined ? [] : flatten(card.children))])
+  return flatten(result.cards).filter(card => card.kind === 'change')
 }
 
 describe('intent cards', () => {
@@ -453,5 +460,131 @@ describe('result card', () => {
   it('uses the last settlement time when one exists', () => {
     const result = chainFromSpans([tool(1, 'edit', { path: 'src/a.ts' }, { startTime: 100, endTime: 9000 })])
     expect(result.cards.at(-1)?.startedAt).toBe(9000)
+  })
+})
+
+
+describe('change notes', () => {
+  it('quotes the reasoning sentence that names the changed file', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { intent: '修复登录重定向' } }),
+      span(2, 'step', 'step:1:1', {
+        attributes: { thinking: '先看路由表。登录跳转写错了，改 auth.ts 里的重定向目标。再补一个用例。' },
+      }),
+      tool(3, 'edit', { path: 'src/auth.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({
+      note: '登录跳转写错了，改 auth.ts 里的重定向目标',
+      noteFrom: 'file',
+    })
+  })
+
+  it('takes the whole sentence that names a bare file name', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: 'auth.ts 少了空值判断，读完再改。' } }),
+      tool(2, 'edit', { path: 'src/deep/auth.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: 'auth.ts 少了空值判断，读完再改', noteFrom: 'file' })
+  })
+
+  it('marks a note that names the file by its stem only', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '把 redirect 的目标补上。' } }),
+      tool(2, 'edit', { path: 'src/redirect.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: '把 redirect 的目标补上', noteFrom: 'file' })
+  })
+
+  it('falls back to the step first sentence when it names no file', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { intent: '修复登录重定向' } }),
+      span(2, 'step', 'step:1:1', { attributes: { thinking: '先看路由表\n再改表单' } }),
+      tool(3, 'edit', { path: 'src/form.tsx' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: '先看路由表', noteFrom: 'step' })
+  })
+
+  it('falls back to the turn intent when the step recorded no reasoning', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { intent: '修复排序空数组问题。再加一个用例。' } }),
+      tool(2, 'edit', { path: 'src/sort.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: '修复排序空数组问题', noteFrom: 'intent' })
+  })
+
+  it('records no note when the session explained nothing', () => {
+    const result = chainFromSpans([tool(1, 'edit', { path: 'src/a.ts' })])
+    expect(changeCards(result)[0]?.meta).toEqual({ path: 'src/a.ts', op: 'update' })
+  })
+
+  it('caps the quoted text at the note limit', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: `${'改 a.ts 的边界'.repeat(40)}。` } }),
+      tool(2, 'edit', { path: 'a.ts' }),
+    ])
+    expect(String(changeCards(result)[0]?.meta?.['note'])).toHaveLength(200)
+  })
+
+  it('joins the notes of two edits merged into one card', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { intent: '第一轮改 auth.ts 的跳转。' } }),
+      tool(2, 'edit', { path: 'src/auth.ts' }),
+      span(3, 'turn', 'turn:2', { attributes: { intent: '补充 auth.ts 的空值分支。' } }),
+      tool(4, 'edit', { path: 'src/auth.ts' }),
+    ])
+    const merged = changeCards(result)[0]
+    expect(merged?.repeat).toBe(2)
+    expect(merged?.meta).toMatchObject({
+      note: '第一轮改 auth.ts 的跳转 补充 auth.ts 的空值分支',
+      noteFrom: 'intent',
+    })
+  })
+
+  it('keeps one note when two edits of one file record the same sentence', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: '改 auth.ts。' } }),
+      tool(2, 'edit', { path: 'src/auth.ts' }),
+      tool(3, 'edit', { path: 'src/auth.ts' }),
+    ])
+    const merged = changeCards(result)[0]
+    expect(merged?.repeat).toBe(2)
+    expect(merged?.meta?.['note']).toBe('改 auth.ts')
+  })
+
+  it('keeps the first note when two layers merge into one card', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { intent: '修复登录跳转' } }),
+      tool(2, 'edit', { path: 'src/auth.ts' }),
+      span(3, 'step', 'step:1:2', { attributes: { thinking: 'auth.ts 少了一个空值分支。' } }),
+      tool(4, 'edit', { path: 'src/auth.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: '修复登录跳转', noteFrom: 'intent' })
+  })
+
+  it('adopts the note of a later edit when the earlier one recorded none', () => {
+    const result = chainFromSpans([
+      tool(1, 'edit', { path: 'src/auth.ts' }),
+      span(2, 'turn', 'turn:1', { attributes: { intent: '修复登录跳转' } }),
+      tool(3, 'edit', { path: 'src/auth.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: '修复登录跳转', noteFrom: 'intent' })
+  })
+
+  it('does not reuse the previous turn reasoning for a later turn', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { intent: '修复登录跳转' } }),
+      span(2, 'step', 'step:1:1', { attributes: { thinking: '先看 auth.ts 的跳转。' } }),
+      span(3, 'turn', 'turn:2', { attributes: { intent: '第二个回合' } }),
+      tool(4, 'edit', { path: 'src/b.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ note: '第二个回合', noteFrom: 'intent' })
+  })
+
+  it('carries the note onto a deletion', () => {
+    const result = chainFromSpans([
+      span(1, 'step', 'step:1:1', { attributes: { thinking: 'old.md 已经没人引用，删掉。' } }),
+      tool(2, 'bash', { op: 'delete', path: 'notes/old.md' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ op: 'delete', note: 'old.md 已经没人引用，删掉', noteFrom: 'file' })
   })
 })

@@ -28,6 +28,15 @@ const MAX_CARDS = 30
 /** 记录文本在卡片标题中保留的字符数；原文仍在展开视图里。 */
 const TITLE_LIMIT = 60
 
+/** 一条改动说明最多搬运的句数。 */
+const NOTE_SENTENCES = 2
+
+/** 一条改动说明的字符上限。 */
+const NOTE_LIMIT = 200
+
+/** 回退到回合意图时保留的字符数。 */
+const NOTE_TURN_LIMIT = 120
+
 /**
  * 按工具调用标识索引的差异块。
  *
@@ -57,6 +66,86 @@ function attrNumber(span: ActivitySpan, key: string): number | undefined {
 function metaCount(card: ChainCard, key: 'files' | 'searches'): number {
   const value = card.meta?.[key]
   return typeof value === 'number' ? value : 0
+}
+
+/** 一句话切分位置：换行，以及中英文的终止标点。 */
+const SENTENCE_BREAK = /[\n。！？!?;；]/
+
+/**
+ * 把记录文本切成句子，去掉空白句。
+ * @param text - 记录的思考或意图原文。
+ * @returns 按原序排列的非空句子。
+ */
+function sentences(text: string): string[] {
+  return text.split(SENTENCE_BREAK).map(part => part.trim()).filter(part => part !== '')
+}
+
+/**
+ * 句子是否点名了该文件：完整路径、文件名，或足够长的无扩展名主干。
+ *
+ * 主干长度下限避免 `a.ts` 这类短名在无关句子里误命中。
+ * @param sentence - 一条候选句子。
+ * @param path - 本次变更的目标路径。
+ * @returns 命中时为 true。
+ */
+function namesFile(sentence: string, path: string): boolean {
+  if (sentence.includes(path)) return true
+  const base = path.slice(path.lastIndexOf('/') + 1)
+  if (base !== '' && sentence.includes(base)) return true
+  const stem = base.slice(0, base.lastIndexOf('.'))
+  return stem.length >= 3 && sentence.includes(stem)
+}
+
+/**
+ * 把若干句子拼成一条有界说明：保留整句，超出上限的那一句被截断。
+ * @param parts - 按原序排列的句子。
+ * @returns 说明文本；没有句子时为 undefined。
+ */
+function boundedNote(parts: readonly string[]): string | undefined {
+  if (parts.length === 0) return undefined
+  return parts.slice(0, NOTE_SENTENCES).join(' ').slice(0, NOTE_LIMIT)
+}
+
+/**
+ * 一个步骤及其回合的可读上下文，用于说明该步骤内的文件变更。
+ *
+ * 思考是模型在动手之前的推理，因此优先于意图；两者都由折叠层记录，投影只读取。
+ */
+interface ChangeContext {
+  /** 当前步骤记录的思考原文。 */
+  readonly thinking?: string | undefined
+  /** 当前回合记录的意图语句。 */
+  readonly intent?: string | undefined
+}
+
+/**
+ * 一条说明的证据强度，由展示层映射为不同的字段名。
+ *
+ * `file` 是点名该文件的句子，`step` 是同一段推理里没有点名该文件的首句（模型的当前
+ * 计划），`intent` 则是本回合的整体目标。读者据此判断这段话是在解释这次改动，还是
+ * 只提供了上下文。
+ */
+type NoteSource = 'file' | 'step' | 'intent'
+
+/**
+ * 为一次文件变更挑选可读的说明。
+ *
+ * 优先搬运点名该文件的句子；没有命中时退回本步骤首句（模型的当前计划），再退到
+ * 本回合意图。全无记录时不产出说明——空说明会让审阅者以为这段改动无人解释，而
+ * 记录里缺的正是那段解释。
+ * @param path - 本次变更的目标路径。
+ * @param context - 该变更所属步骤与回合的记录文本。
+ * @returns 说明文本及其来源；没有任何可搬运内容时为 undefined。
+ */
+function changeNote(path: string, context: ChangeContext): { note: string; noteFrom: NoteSource } | undefined {
+  const fromStep = context.thinking === undefined ? [] : sentences(context.thinking)
+  const matched = boundedNote(fromStep.filter(sentence => namesFile(sentence, path)))
+  if (matched !== undefined) return { note: matched, noteFrom: 'file' }
+  const first = fromStep[0]
+  if (first !== undefined) return { note: first.slice(0, NOTE_LIMIT), noteFrom: 'step' }
+  const intent = context.intent === undefined ? undefined : sentences(context.intent)[0]
+  if (intent === undefined) return undefined
+  return { note: intent.slice(0, NOTE_TURN_LIMIT), noteFrom: 'intent' }
 }
 
 /** 一张变更卡片的目标路径；变更卡片总是带有变更标题。 */
@@ -209,10 +298,12 @@ function recordedDiffs(span: ActivitySpan, diffs: ChangeDiffs): readonly ChainDi
 }
 
 /** 一次文件创建、修改或删除；删除用 error 状态标出。 */
-function changeCard(span: ActivitySpan, diffs: ChangeDiffs): ChainCard {
+function changeCard(span: ActivitySpan, diffs: ChangeDiffs, context: ChangeContext): ChainCard {
   const path = changePath(span)
   const recorded = recordedDiffs(span, diffs)
   const recordedField = recorded === undefined ? {} : { diffs: recorded }
+  const explanation = changeNote(path, context)
+  const noteField = explanation === undefined ? {} : { note: explanation.note, noteFrom: explanation.noteFrom }
   if (attrString(span, 'op') === 'delete' || span.name === 'delete') {
     return {
       id: `change:${span.seq}`,
@@ -222,7 +313,7 @@ function changeCard(span: ActivitySpan, diffs: ChangeDiffs): ChainCard {
       status: 'error',
       evidenceSeqs: [span.seq],
       ...recordedField,
-      meta: { path, op: 'delete' },
+      meta: { path, op: 'delete', ...noteField },
     }
   }
   const created = attrString(span, 'op') === 'create'
@@ -234,7 +325,7 @@ function changeCard(span: ActivitySpan, diffs: ChangeDiffs): ChainCard {
     status: 'ok',
     evidenceSeqs: [span.seq],
     ...recordedField,
-    meta: { path, op: created ? 'create' : 'update' },
+    meta: { path, op: created ? 'create' : 'update', ...noteField },
   }
 }
 
@@ -357,6 +448,9 @@ function mergeLevel(cards: readonly ChainCard[]): ChainCard[] {
  *
  * 行动是这段思考的直接结果，因此归到思考卡片下；没有记录思考的步骤没有可归属
  * 的对象，它的行动卡片留在链上平铺。
+ *
+ * 一次变更的说明取自它所属步骤记录的思考，没有思考时退回所属回合的意图，因此这里
+ * 与归属映射一样按序号顺序跟踪当前步骤与当前回合。
  * @param spans - 按序号升序排列的跨度。
  * @param actions - 每个步骤的行动计数。
  * @param diffs - 记录的差异块。
@@ -373,8 +467,17 @@ function assembleCards(
   // 就归到它下面。
   const thinking = new Map<number, number>()
   const children = new Map<number, ChainCard[]>()
+  let stepContext: ChangeContext = {}
+  let turnContext: ChangeContext = {}
   for (const span of spans) {
-    const cards = baseCards(span, actions, diffs)
+    // 新回合开启时清空步骤上下文：上一个回合的推理不得解释这个回合的改动。
+    if (span.kind === 'turn') {
+      turnContext = { intent: attrString(span, 'intent') }
+      stepContext = {}
+    }
+    if (span.kind === 'step') stepContext = { thinking: attrString(span, 'thinking') }
+    const context: ChangeContext = { ...stepContext, ...turnContext }
+    const cards = baseCards(span, actions, diffs, context)
     const first = cards[0]
     if (span.kind === 'step' && first !== undefined) {
       thinking.set(span.seq, top.length)
@@ -398,7 +501,12 @@ function assembleCards(
 }
 
 /** 构建一个跨度所贡献的卡片；不支撑任何卡片的跨度返回空数组。 */
-function baseCards(span: ActivitySpan, actions: ReadonlyMap<number, ChainActions>, diffs: ChangeDiffs): ChainCard[] {
+function baseCards(
+  span: ActivitySpan,
+  actions: ReadonlyMap<number, ChainActions>,
+  diffs: ChangeDiffs,
+  context: ChangeContext,
+): ChainCard[] {
   if (span.kind === 'turn') return turnCards(span)
   if (span.kind === 'step') return stepCards(span, actions.get(span.seq))
 
@@ -432,7 +540,7 @@ function baseCards(span: ActivitySpan, actions: ReadonlyMap<number, ChainActions
   const action = toolAction(span)
   if (action === 'interrupt') return [interruptCard(span)]
   if (action === 'verify') return [verifyCard(span)]
-  if (action === 'change') return [changeCard(span, diffs)]
+  if (action === 'change') return [changeCard(span, diffs, context)]
   return [reconCard(span)]
 }
 
@@ -457,6 +565,53 @@ function mergeRecon(cards: readonly ChainCard[]): ChainCard[] {
   return out
 }
 
+/** 一张卡片记录的说明及其来源。 */
+interface RecordedNote {
+  /** 搬运来的说明文本。 */
+  readonly note: string
+  /**
+   * 说明的来源：点名该文件的句子，本步的计划，或本回合的目标。
+   *
+   * 来源不改变说明的文本，只改变展示层的字段名，读者据此判断这段话是在解释这次
+   * 改动，还是只提供了上下文。
+   */
+  readonly noteFrom: NoteSource
+}
+
+/**
+ * 读取一张卡片记录的说明。
+ * @param meta - 卡片事实。
+ * @returns 说明及其来源；没有记录时为 undefined。
+ */
+function recordedNote(meta: ChainCard['meta']): RecordedNote | undefined {
+  const note = meta?.['note']
+  const noteFrom = meta?.['noteFrom']
+  if (typeof note !== 'string' || !isNoteSource(noteFrom)) return undefined
+  return { note, noteFrom }
+}
+
+/**
+ * 合并两张指向同一文件的卡片上的说明。
+ *
+ * 合并后的卡片代表同一层里的多次编辑，相邻编辑常重复同一句话，因此只在两句不同时
+ * 拼接，并保留首个说明的来源标签——它描述的是这张卡片上第一段被搬运的推理。
+ * @param current - 已入列卡片的事实。
+ * @param incoming - 新卡片的事实。
+ * @returns 要覆盖的说明字段；沿用已入列卡片或新卡片没有说明时为空对象。
+ */
+function mergeNotes(current: ChainCard['meta'], incoming: ChainCard['meta']): { note?: string; noteFrom?: NoteSource } {
+  const first = recordedNote(current)
+  const second = recordedNote(incoming)
+  if (second === undefined || second.note === first?.note) return {}
+  if (first === undefined) return { ...second }
+  return { note: `${first.note} ${second.note}`.slice(0, NOTE_LIMIT), noteFrom: first.noteFrom }
+}
+
+/** 该值是否是一种已知的说明来源。 */
+function isNoteSource(value: unknown): value is NoteSource {
+  return value === 'file' || value === 'step' || value === 'intent'
+}
+
 /** 合并指向同一文件的变更卡片；合并后的卡片保留首次编辑的位置。 */
 function mergeChanges(cards: readonly ChainCard[]): ChainCard[] {
   const positions = new Map<string, number>()
@@ -476,11 +631,13 @@ function mergeChanges(cards: readonly ChainCard[]): ChainCard[] {
     }
     positions.set(path, existing)
     const merged = [...(current.diffs ?? []), ...(card.diffs ?? [])]
+    const notes = mergeNotes(current.meta, card.meta)
     out[existing] = {
       ...current,
       repeat: (current.repeat ?? 1) + 1,
       evidenceSeqs: [...current.evidenceSeqs, ...card.evidenceSeqs],
       ...(merged.length === 0 ? {} : { diffs: merged }),
+      ...(notes.note === undefined ? {} : { meta: { ...current.meta, ...notes } }),
     }
   }
   return out

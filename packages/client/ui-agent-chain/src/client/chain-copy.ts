@@ -75,6 +75,13 @@ const OP_KEYS: Readonly<Record<string, AgentChainKey>> = {
   delete: 'op.delete',
 }
 
+/** 命名一种变更说明来源的词典键；没有记录来源时按未点名的本步上下文显示。 */
+const NOTE_KEYS: Readonly<Record<string, AgentChainKey>> = {
+  file: 'meta.noteChanged',
+  step: 'meta.noteStep',
+  intent: 'meta.noteTurn',
+}
+
 /** 卡片展开时显示的一条带标签的事实。 */
 export interface ChainDetailRow {
   /** 本地化的字段名。 */
@@ -374,6 +381,10 @@ export function detailRows(card: ChainCard, t: ChainTranslate, label: ChainPathL
   if (thinking !== undefined) rows.push({ label: t('meta.thinking'), value: thinking })
   const path = metaString(card.meta, 'path')
   if (path !== undefined) rows.push({ label: t('meta.path'), value: label(path), file: path })
+  const note = metaString(card.meta, 'note')
+  // 来源缺失时按本步上下文标注：一条说明点没点名该文件由投影决定，展示层不重复推断。
+  const noteKey = NOTE_KEYS[metaString(card.meta, 'noteFrom') ?? ''] ?? 'meta.noteStep'
+  if (note !== undefined) rows.push({ label: t(noteKey), value: note })
   const command = metaString(card.meta, 'command')
   if (command !== undefined) rows.push({ label: t('meta.command'), value: command })
   const tool = metaString(card.meta, 'tool')
