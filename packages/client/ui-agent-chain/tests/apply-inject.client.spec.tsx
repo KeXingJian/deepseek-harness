@@ -18,7 +18,7 @@ usePinnedBrowserLanguages('en-US')
 
 const ROOT = 'root-1' as SessionId
 
-/** One change card, one risk flag, and the tool span it cites. */
+/** One change card, its recorded file, and the tool span it cites. */
 function chainSnapshot(path: string): ChainSnapshot {
   return {
     cards: [{
@@ -30,12 +30,8 @@ function chainSnapshot(path: string): ChainSnapshot {
       meta: { path },
       evidenceSeqs: [7],
     }],
-    flags: [{
-      code: 'touches-tests',
-      severity: 'danger',
-      reason: { copy: 'touchesTests' },
-      evidenceFiles: ['tests/a.spec.ts'],
-    }],
+    mergedCards: [],
+    flags: [],
     spans: [{ seq: 7, kind: 'tool', name: 'bash', startTime: 0, status: 'ok', attributes: { callId: 'call-7' } }],
   }
 }
@@ -92,9 +88,6 @@ describe('review chain inject face', () => {
     fireEvent.click(b.chainView().getByRole('button', { name: 'Show evidence' }))
     fireEvent.click(b.chainView().getByRole('button', { name: 'Open in preview src/a.ts' }))
     expect(b.openResource).toHaveBeenLastCalledWith('dsh-resource://file/session/root-1/src/a.ts')
-
-    fireEvent.click(b.chainView().getByRole('button', { name: 'Open in preview tests/a.spec.ts' }))
-    expect(b.openResource).toHaveBeenLastCalledWith('dsh-resource://file/session/root-1/tests/a.spec.ts')
 
     // Without a Session row the Host list no longer holds, an absolute path
     // stays absolute in the Session-scoped address instead of being re-rooted.

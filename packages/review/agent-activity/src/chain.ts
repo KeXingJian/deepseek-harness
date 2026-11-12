@@ -220,13 +220,14 @@ function turnCards(span: ActivitySpan): ChainCard[] {
   }
   const intent = attrString(span, 'intent')
   if (intent !== undefined && intent.trim() !== '') {
+    const seq = attrNumber(span, 'intentSeq') ?? span.seq
     cards.push({
-      id: `intent:${span.seq}`,
+      id: `intent:${seq}`,
       kind: 'intent',
       title: { copy: 'intent', text: intent.trim().slice(0, TITLE_LIMIT) },
       startedAt: span.startTime,
       status: 'ok',
-      evidenceSeqs: [span.seq],
+      evidenceSeqs: [seq],
     })
   }
   return cards
@@ -460,6 +461,7 @@ function assembleCards(
   spans: readonly ActivitySpan[],
   actions: ReadonlyMap<number, ChainActions>,
   diffs: ChangeDiffs,
+  mergeActions = true,
 ): ChainCard[] {
   const owner = stepOwnership(spans)
   const top: ChainCard[] = []
@@ -495,7 +497,11 @@ function assembleCards(
     const nested = children.get(step)
     const card = top[index]
     if (nested === undefined || card === undefined) continue
-    top[index] = { ...card, children: capCards(mergeLevel(nested)) }
+    top[index] = {
+      ...card,
+      children: mergeActions ? capCards(mergeLevel(nested)) : [...nested],
+      meta: { ...card.meta, stepSeq: step },
+    }
   }
   return top
 }
@@ -784,18 +790,58 @@ function markFlagged(cards: readonly ChainCard[], flagged: ReadonlySet<string>):
  * @param spans - 采集层的跨度，按序号升序排列。
  * @param userText - 用户的任务文本，仅用于范围外启发式判断；为空时使用链中记录的人类提示词。
  * @param diffs - 每条工具调用记录的差异块，按调用标识索引；省略表示都没有记录。
- * @returns 按展示顺序排列的卡片，以及按严重程度排序的风险标记。
+ * @param options.merge - 是否折叠相邻勘察、重复改动、成功校验与相似意图；默认为 true。
+ * @returns 卡片与风险标记；`merge: false` 时卡片逐条平铺且不受合并展示上限影响。
  */
 export function chainFromSpans(
   spans: readonly ActivitySpan[],
   userText = '',
   diffs: ChangeDiffs = NO_DIFFS,
+  options: { readonly merge?: boolean } = {},
 ): ChainResult {
   const ordered = [...spans].sort((left, right) => left.seq - right.seq)
   const actions = stepActionCounts(ordered)
-  const merged = mergeLevel(assembleCards(ordered, actions, diffs))
+  const merge = options.merge ?? true
+  const assembled = assembleCards(ordered, actions, diffs, merge)
+  if (!merge) {
+    const timeline = sortCards(flattenTimeline(assembled))
+    const cards = [...timeline, resultCard(ordered, timeline)]
+    const flags = reviewFlags(ordered, flattenCards(cards), userText === '' ? recordedTask(ordered) : userText)
+    const flagged = new Set(flags.filter(flag => flag.code !== 'unverified').flatMap(flag => flag.evidenceFiles))
+    return { cards: markFlagged(cards, flagged), flags }
+  }
+  const merged = sortTimeline(mergeLevel(assembled))
   const cards = capCards([...merged, resultCard(ordered, flattenCards(merged))])
   const flags = reviewFlags(ordered, flattenCards(cards), userText === '' ? recordedTask(ordered) : userText)
   const flagged = new Set(flags.filter(flag => flag.code !== 'unverified').flatMap(flag => flag.evidenceFiles))
   return { cards: markFlagged(cards, flagged), flags }
+}
+
+/** 按首个依据事件的序号排列合并卡片及其行动。 */
+function sortTimeline(cards: readonly ChainCard[]): ChainCard[] {
+  return sortCards(cards)
+}
+
+/** 按事件时间顺序展开思考卡片的行动，不保留嵌套。 */
+function flattenTimeline(cards: readonly ChainCard[]): ChainCard[] {
+  return cards.flatMap((card) => {
+    if (card.children === undefined) return [card]
+    const { children, ...parent } = card
+    return [parent, ...flattenTimeline(children)]
+  })
+}
+
+/** 按首个依据事件的序号稳定排序卡片；相同时保留原事件顺序。 */
+function sortCards(cards: readonly ChainCard[]): ChainCard[] {
+  return cards
+    .map((card, index) => ({ card, index, seq: eventSeq(card) }))
+    .sort((left, right) => (left.seq ?? Number.MAX_SAFE_INTEGER) - (right.seq ?? Number.MAX_SAFE_INTEGER) || left.index - right.index)
+    .map(entry => entry.card)
+}
+
+/** 读取卡片最早引用的事件序号；思考卡保留步骤的开启序号。 */
+function eventSeq(card: ChainCard): number | undefined {
+  const stepSeq = card.meta?.['stepSeq']
+  if (card.kind === 'thinking' && typeof stepSeq === 'number') return stepSeq
+  return card.evidenceSeqs[0]
 }

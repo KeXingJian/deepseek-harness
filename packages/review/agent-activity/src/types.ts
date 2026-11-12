@@ -20,8 +20,8 @@ export interface ActivitySpan {
   readonly status: 'running' | 'ok' | 'error' | 'cancelled' | 'interrupted'
   /**
    * 采集层附加到该跨度上的展示信息：模型给出的工具参数（目标文件统一记为
-   * `path`）、文件变更工具上报或 bash 删除派生的 `op`、回合的单行 `intent`、
-   * 该回合的人类提示词 `prompt` 及其事件序号 `promptSeq`、步骤内助手的思考原文
+   * `path`）、文件变更工具上报或 bash 删除派生的 `op`、回合的单行 `intent` 及其事件序号
+   * `intentSeq`、该回合的人类提示词 `prompt` 及其事件序号 `promptSeq`、步骤内助手的思考原文
    * `thinking` 及其事件序号 `thinkingSeq`，以及在检查视图中定位某次工具调用的
    * 已记录 `callId`。
    */

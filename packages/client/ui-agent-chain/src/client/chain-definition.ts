@@ -85,6 +85,9 @@ export const chainDefinition: ConversationNodeDefinition<ChainState> = {
   buildViewNode: (context) => {
     const state = context.state
     if (state === undefined) return null
+    const spans = state.activity.spans
+    const chain = chainFromSpans(spans, '', state.diffs, { merge: false })
+    const merged = chainFromSpans(spans, '', state.diffs)
     return {
       // Context 的身份由引擎掌握；手写的 key 无法通过校验。
       key: context.key,
@@ -93,7 +96,7 @@ export const chainDefinition: ConversationNodeDefinition<ChainState> = {
       target: 'agent-chain',
       // 仅凭结果无法展示卡片背后的内容：展开时会按序号读取原始 span，
       // 因此快照会携带折叠出它的那些 span。
-      data: { ...chainFromSpans(state.activity.spans, '', state.diffs), spans: state.activity.spans },
+      data: { ...chain, mergedCards: merged.cards, spans },
     }
   },
 }

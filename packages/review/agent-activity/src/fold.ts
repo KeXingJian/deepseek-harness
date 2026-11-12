@@ -266,7 +266,10 @@ export function applyActivityEvent(state: ActivityState, event: SessionEvent): A
       if (turnIndex !== undefined && turnSpan !== undefined && turnSpan.attributes?.intent === undefined) {
         const intent = intentOf(content)
         if (intent !== undefined) {
-          next = closed(state, turnIndex, turnSpan, { ...turnSpan, attributes: { ...turnSpan.attributes, intent } })
+          next = closed(state, turnIndex, turnSpan, {
+            ...turnSpan,
+            attributes: { ...turnSpan.attributes, intent, intentSeq: event.seq },
+          })
         }
       }
       const stepKey = `${String(event.data.turn)}:${String(event.data.step)}`

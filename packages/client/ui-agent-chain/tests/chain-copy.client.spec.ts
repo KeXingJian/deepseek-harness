@@ -1,17 +1,17 @@
 /**
- * Review-chain presentation vocabulary: status dots, filters, localized card
- * titles and risk reasons, expansion rows, and the expandable decision.
+ * Review-chain presentation vocabulary: status dots, controls, localized card
+ * titles, expansion rows, and the expandable decision.
  */
 import { describe, expect, it } from 'vitest'
-import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag, RiskReason } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan, ChainCard, ChainTitle } from '@deepseek-ai/dsh-agent-activity'
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { en, type AgentChainKey } from '../src/client/locales.ts'
 import { relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
 import {
-  CHAIN_FILTERS, FILTER_KEYS, KIND_GLYPHS, KIND_KEYS, SEVERITY_KEYS, SEVERITY_TONES,
-  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, filterCards, hideReconCards,
-  isExpandable, riskReason, spanDot, statusDot,
+  KIND_GLYPHS, KIND_KEYS,
+  actionSummary, cardDiffs, cardTitle, detailRows, diffLabels, evidenceSpans, hideReconCards,
+  isExpandable, spanDot, statusDot,
 } from '../src/client/chain-copy.ts'
 import type { ChainPathLabel } from '../src/client/chain-copy.ts'
 
@@ -42,11 +42,6 @@ function intent(text: string): ChainCard {
   return card({ kind: 'intent', title: { copy: 'intent', text } })
 }
 
-/** One risk flag carrying the finding under test. */
-function flag(reason: RiskReason): RiskFlag {
-  return { code: reason.copy, severity: 'warn', reason, evidenceFiles: [] }
-}
-
 /** One contributing span as the Definition publishes it. */
 function span(
   seq: number,
@@ -70,11 +65,10 @@ describe('statusDot', () => {
   })
 })
 
-describe('filter vocabulary', () => {
-  it('offers all three filters in display order with their keys', () => {
-    expect(CHAIN_FILTERS).toEqual(['all', 'changes', 'risks'])
-    expect(CHAIN_FILTERS.map(value => t(FILTER_KEYS[value])))
-      .toEqual(['All', 'Changes only', 'Risks only'])
+describe('chain controls', () => {
+  it('localizes both target timeline modes', () => {
+    expect(t('merge.showChronological')).toBe('Show events chronologically')
+    expect(t('merge.showMerged')).toBe('Show merged events')
   })
 
   it('names and tones every card kind', () => {
@@ -83,12 +77,6 @@ describe('filter vocabulary', () => {
       .toEqual(['Prompt', 'Thinking', 'Intent', 'Recon', 'Change', 'Verify', 'Interrupt', 'Result'])
     // 字形是区分类别的第一层；八种类别各有自己的图形。
     expect(new Set(kinds.map(kind => KIND_GLYPHS[kind])).size).toBe(kinds.length)
-  })
-
-  it('names and tones every risk severity', () => {
-    const severities = ['danger', 'warn', 'info'] as const
-    expect(severities.map(severity => t(SEVERITY_KEYS[severity]))).toEqual(['Blocker', 'Warning', 'Note'])
-    expect(severities.map(severity => SEVERITY_TONES[severity])).toEqual(['danger', 'warning', 'info'])
   })
 })
 
@@ -200,71 +188,6 @@ describe('actionSummary', () => {
     expect(actionSummary({ files: 0, searches: 2, changes: 0, verifications: 1 }, t))
       .toBe('searched 2 times · verified 1 times')
     expect(actionSummary({ files: 0, searches: 0, changes: 0, verifications: 0 }, t)).toBe('')
-  })
-})
-
-describe('riskReason', () => {
-  it('names every rule finding', () => {
-    expect(riskReason(flag({ copy: 'touchesTests' }), t)).toBe('Changed test files')
-    expect(riskReason(flag({ copy: 'touchesCi' }), t)).toBe('Changed CI or build configuration')
-    expect(riskReason(flag({ copy: 'deletes', count: 2 }), t)).toBe('Deleted 2 files')
-    expect(riskReason(flag({ copy: 'outOfScope' }), t))
-      .toBe('These files appear in no task description or exploration (inferred)')
-    expect(riskReason(flag({ copy: 'unverified' }), t)).toBe('Changes exist, but no verification passed')
-    expect(riskReason(flag({ copy: 'gaveUp' }), t))
-      .toBe('Kept editing after the same verification failed repeatedly')
-    expect(riskReason(flag({ copy: 'planChurn', count: 5 }), t))
-      .toBe('The objective changed 5 times in this session')
-  })
-})
-
-describe('filterCards', () => {
-  const cards = [
-    intent('plan'),
-    card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' }, status: 'ok' }),
-    card({ kind: 'verify', title: { copy: 'verifyFailed', command: 'go test' }, status: 'error' }),
-    card({ kind: 'interrupt', title: { copy: 'interrupt', seconds: 1 }, status: 'warning' }),
-  ]
-
-  it('keeps the whole list for the default filter', () => {
-    expect(filterCards(cards, 'all')).toBe(cards)
-  })
-
-  it('keeps only changes for the changes filter', () => {
-    expect(filterCards(cards, 'changes').map(entry => entry.kind)).toEqual(['change'])
-  })
-
-  it('keeps failed and warned cards for the risks filter', () => {
-    expect(filterCards(cards, 'risks').map(entry => entry.kind)).toEqual(['verify', 'interrupt'])
-  })
-
-  it('promotes matching child cards to the top level', () => {
-    const nested = card({
-      kind: 'thinking',
-      title: { copy: 'thinking', text: 'change the router' },
-      children: [
-        card({ id: 'change:2', kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' } }),
-        card({ id: 'recon:3', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } }),
-        card({
-          id: 'change:4',
-          kind: 'change',
-          title: { copy: 'change', op: 'update', path: 'b.ts' },
-          status: 'warning',
-        }),
-      ],
-    })
-    expect(filterCards([nested], 'changes').map(entry => entry.id)).toEqual(['change:2', 'change:4'])
-    expect(filterCards([nested], 'risks').map(entry => entry.id)).toEqual(['change:4'])
-  })
-
-  it('keeps a warned parent beside its matching child', () => {
-    const nested = card({
-      kind: 'thinking',
-      title: { copy: 'thinking', text: 'change the router' },
-      status: 'warning',
-      children: [card({ id: 'recon:2', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } })],
-    })
-    expect(filterCards([nested], 'risks').map(entry => entry.id)).toEqual(['thinking:1'])
   })
 })
 

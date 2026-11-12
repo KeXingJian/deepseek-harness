@@ -1,34 +1,19 @@
 /**
- * 评审链的展示词汇：筛选选择、类型标签与配色、状态圆点，以及单张卡片
- * 可提供的展开行。
+ * 评审链的展示词汇：类型标签与配色、状态圆点，以及单张卡片可提供的展开行。
  */
 
 import type { ComponentType } from 'react'
 import type {
-  ActivitySpan, ChangeOp, ChainActions, ChainCard, ChainKind, ChainStatus, ChainTitle, RiskFlag, RiskReason,
-  RiskSeverity,
+  ActivitySpan, ChangeOp, ChainActions, ChainCard, ChainKind, ChainStatus, ChainTitle,
 } from '@deepseek-ai/dsh-agent-activity'
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
-import type { DiffBlockLabels, DiffHunk, IconProps, StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { DiffBlockLabels, DiffHunk, IconProps, StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   IconCheckCircleOutlineRegular, IconChecklistOutlineRegular, IconEditOutlineRegular, IconPlanOutlineRegular,
   IconQuestionOutlineRegular, IconSearchOutlineRegular, IconThinkOutlineRegular, IconUserOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { AgentChainKey } from './locales.ts'
-
-/** 读者要求查看哪些卡片。 */
-export type ChainFilter = 'all' | 'changes' | 'risks'
-
-/** 按展示顺序排列的筛选按钮。 */
-export const CHAIN_FILTERS: readonly ChainFilter[] = ['all', 'changes', 'risks']
-
-/** 命名一个筛选器的词典键。 */
-export const FILTER_KEYS: Readonly<Record<ChainFilter, AgentChainKey>> = {
-  all: 'filter.all',
-  changes: 'filter.changes',
-  risks: 'filter.risks',
-}
 
 /** 命名一种卡片类型的词典键。 */
 export const KIND_KEYS: Readonly<Record<ChainKind, AgentChainKey>> = {
@@ -52,20 +37,6 @@ export const KIND_GLYPHS: Readonly<Record<ChainKind, ComponentType<IconProps>>> 
   verify: IconChecklistOutlineRegular,
   interrupt: IconQuestionOutlineRegular,
   result: IconCheckCircleOutlineRegular,
-}
-
-/** 一种风险严重程度的标签配色。 */
-export const SEVERITY_TONES: Readonly<Record<RiskSeverity, TagTone>> = {
-  danger: 'danger',
-  warn: 'warning',
-  info: 'info',
-}
-
-/** 命名一种风险严重程度的词典键。 */
-export const SEVERITY_KEYS: Readonly<Record<RiskSeverity, AgentChainKey>> = {
-  danger: 'severity.danger',
-  warn: 'severity.warn',
-  info: 'severity.info',
 }
 
 /** 命名投影记录的一种变更操作的词典键。 */
@@ -231,38 +202,6 @@ function titleText(title: ChainTitle, t: ChainTranslate, label: ChainPathLabel):
 }
 
 /**
- * 用读者的语言组合一个风险标记的原因。
- * @param flag - 要渲染的标记。
- * @param t - 评审链翻译器。
- * @returns 原因文本。
- */
-export function riskReason(flag: RiskFlag, t: ChainTranslate): string {
-  return reasonText(flag.reason, t)
-}
-
-/** 组合一条规则发现的原因。 */
-function reasonText(reason: RiskReason, t: ChainTranslate): string {
-  switch (reason.copy) {
-    case 'touchesTests':
-      return t('risk.touchesTests')
-    case 'touchesCi':
-      return t('risk.touchesCi')
-    case 'deletes':
-      return t('risk.deletes', { count: reason.count })
-    case 'outOfScope':
-      return t('risk.outOfScope')
-    case 'unverified':
-      return t('risk.unverified')
-    case 'gaveUp':
-      return t('risk.gaveUp')
-    case 'planChurn':
-      return t('risk.planChurn', { count: reason.count })
-  }
-  /* v8 ignore next -- 封闭联合的兜底分支；上面已处理所有规则发现。 */
-  return assertNever(reason, 'risk reason')
-}
-
-/**
  * 把卡片状态映射到共享的状态圆点。
  * @param state - 投影得到的卡片状态。
  * @returns 圆点状态；`ok` 显示为完成，`running` 显示为进行中的加载指示。
@@ -277,31 +216,6 @@ export function statusDot(state: ChainStatus | undefined): StateDotState {
       return 'ongoing'
     default:
       return 'done'
-  }
-}
-
-/**
- * 保留某个筛选器允许的卡片。
- *
- * 行动子卡也能被筛选：命中的子卡提升到顶层单独成行，否则改动或风险会随
- * 思考卡片一起被筛掉。
- * @param cards - 按展示顺序排列的链卡片。
- * @param filter - 选中的筛选器。
- * @returns 匹配的卡片；`all` 会保持输入数组不变。
- */
-export function filterCards(cards: readonly ChainCard[], filter: ChainFilter): readonly ChainCard[] {
-  switch (filter) {
-    case 'changes':
-      return cards.flatMap(card => card.kind === 'change'
-        ? [card]
-        : filterCards(card.children ?? [], filter))
-    case 'risks':
-      return cards.flatMap((card) => {
-        const matched = card.status === 'error' || card.status === 'warning' ? [card] : []
-        return [...matched, ...filterCards(card.children ?? [], filter)]
-      })
-    default:
-      return cards
   }
 }
 

@@ -20,6 +20,7 @@ const CHAIN: ChainSnapshot = {
     status: 'ok',
     evidenceSeqs: [1],
   }],
+  mergedCards: [],
   flags: [{
     code: 'touches-tests',
     severity: 'danger',
@@ -49,7 +50,7 @@ describe('chain view target', () => {
   it('replaces the published node when the engine republishes its key', () => {
     const builder = chainViewDefinition.create()
     builder.apply({ upserts: [node(CHAIN, 'stable-key')], timeline: TIMELINE })
-    const next: ChainSnapshot = { cards: [], flags: [], spans: [] }
+    const next: ChainSnapshot = { cards: [], mergedCards: [], flags: [], spans: [] }
     expect(builder.apply({ upserts: [node(next, 'stable-key')], timeline: TIMELINE })).toBe(next)
   })
 

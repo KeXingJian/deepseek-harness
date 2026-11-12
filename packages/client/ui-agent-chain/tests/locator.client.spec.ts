@@ -69,15 +69,43 @@ function row(id: string, scrollIntoView: () => void): HTMLElement {
 }
 
 describe('locatorBars', () => {
-  it('maps each card to its identity, kind, and localized title', () => {
+  it('keeps prompt and change bars in event order with their list indexes', () => {
     const bars = locatorBars([
+      { ...card('change:2', 'change', 'a.ts modified'), evidenceSeqs: [2] },
       card('intent:1', 'intent', 'inspect the catalog'),
-      card('change:2', 'change', 'a.ts modified'),
+      { ...card('prompt:0', 'prompt', 'fix the redirect'), evidenceSeqs: [1] },
     ], t, path => path)
     expect(bars).toEqual([
-      { id: 'intent:1', kind: 'intent', title: 'inspect the catalog' },
-      { id: 'change:2', kind: 'change', title: 'a.ts modified' },
+      { id: 'prompt:0', kind: 'prompt', title: 'fix the redirect', index: 2 },
+      { id: 'change:2', kind: 'change', title: 'a.ts modified', index: 0 },
     ])
+  })
+
+  it('orders prompt and change bars together by evidence sequence', () => {
+    const bars = locatorBars([
+      { ...card('change:30', 'change', 'later.ts'), evidenceSeqs: [30] },
+      { ...card('prompt:5', 'prompt', 'fix the redirect'), evidenceSeqs: [5] },
+      { ...card('change:20', 'change', 'earlier.ts'), evidenceSeqs: [20] },
+    ], t, path => path)
+    expect(bars.map(bar => bar.id)).toEqual(['prompt:5', 'change:20', 'change:30'])
+    expect(bars.map(bar => bar.index)).toEqual([1, 2, 0])
+  })
+
+  it('keeps a thinking card that folds out a change and drops one that folds out only recon', () => {
+    const withChange: ChainCard = {
+      ...card('thinking:1', 'thinking', 'start with the router'),
+      children: [card('change:2', 'change', 'a.ts modified')],
+    }
+    const withoutChange: ChainCard = {
+      ...card('thinking:3', 'thinking', 'keep reading'),
+      children: [card('recon:4', 'recon', '2 files')],
+    }
+    const bars = locatorBars([withChange, withoutChange], t, path => path)
+    expect(bars).toEqual([{ id: 'thinking:1', kind: 'thinking', title: 'start with the router', index: 0 }])
+  })
+
+  it('guides nothing in a chain without prompts or changes', () => {
+    expect(locatorBars([card('intent:1', 'intent', 'inspect the catalog')], t, path => path)).toEqual([])
   })
 })
 
@@ -113,44 +141,60 @@ describe('scrollToCard', () => {
 })
 
 describe('useActiveBar', () => {
+  /** The bar identities a test guides with: the prompt and the change, not the skipped intent. */
+  const BARS = ['prompt:0', 'change:2']
+
   it('reports nothing before an observation or without an observer', () => {
     const list = document.createElement('ol')
-    const view = renderHook(() => useActiveBar(list, '0'))
+    const view = renderHook(() => useActiveBar(list, '0', BARS))
     expect(view.result.current).toBeUndefined()
     view.unmount()
   })
 
   it('reports nothing while the list is not mounted', () => {
     vi.stubGlobal('IntersectionObserver', ObserverStub)
-    const view = renderHook(() => useActiveBar(null, '0'))
+    const view = renderHook(() => useActiveBar(null, '0', BARS))
     expect(view.result.current).toBeUndefined()
     expect(ObserverStub.instances).toHaveLength(0)
     view.unmount()
   })
 
-  it('tracks the topmost card inside the reading band', () => {
+  it('tracks the topmost guided card inside the reading band', () => {
     vi.stubGlobal('IntersectionObserver', ObserverStub)
     const list = document.createElement('ol')
-    list.append(row('intent:1', vi.fn()), row('change:2', vi.fn()))
-    const view = renderHook(() => useActiveBar(list, '0'))
+    list.append(row('prompt:0', vi.fn()), row('intent:1', vi.fn()), row('change:2', vi.fn()))
+    const view = renderHook(() => useActiveBar(list, '0', BARS))
     const observer = ObserverStub.instances[0]!
-    expect(observer.observed).toHaveLength(2)
-    act(() => { observer.report(list.children[1]!, true) })
+    // Only the guided rows are observed, so bar indexes never count skipped cards.
+    expect(observer.observed).toEqual([list.children[0], list.children[2]])
+    act(() => { observer.report(list.children[2]!, true) })
     expect(view.result.current).toBe(1)
     act(() => { observer.report(list.children[0]!, true) })
     expect(view.result.current).toBe(0)
     act(() => { observer.report(list.children[0]!, false) })
-    act(() => { observer.report(list.children[1]!, false) })
+    act(() => { observer.report(list.children[2]!, false) })
     expect(view.result.current).toBeUndefined()
     view.unmount()
     expect(observer.disconnected).toBe(true)
   })
 
+  it('skips a guided bar the current page has not rendered', () => {
+    vi.stubGlobal('IntersectionObserver', ObserverStub)
+    const list = document.createElement('ol')
+    list.append(row('prompt:0', vi.fn()))
+    const view = renderHook(() => useActiveBar(list, '0', BARS))
+    const observer = ObserverStub.instances[0]!
+    expect(observer.observed).toEqual([list.children[0]])
+    act(() => { observer.report(list.children[0]!, true) })
+    expect(view.result.current).toBe(0)
+    view.unmount()
+  })
+
   it('drops a reading from an earlier row set', () => {
     vi.stubGlobal('IntersectionObserver', ObserverStub)
     const list = document.createElement('ol')
-    list.append(row('intent:1', vi.fn()), row('change:2', vi.fn()))
-    const view = renderHook(({ key }: { key: string }) => useActiveBar(list, key), { initialProps: { key: '0' } })
+    list.append(row('prompt:0', vi.fn()), row('change:2', vi.fn()))
+    const view = renderHook(({ key }: { key: string }) => useActiveBar(list, key, BARS), { initialProps: { key: '0' } })
     act(() => { ObserverStub.instances[0]!.report(list.children[0]!, true) })
     expect(view.result.current).toBe(0)
     view.rerender({ key: '1' })

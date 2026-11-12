@@ -9,8 +9,10 @@ import type { ActivitySpan, ChainCard, RiskFlag } from '@deepseek-ai/dsh-agent-a
 
 /** 视图渲染的内容：某个 Session 投影出的链。 */
 export interface ChainSnapshot {
-  /** 按展示顺序排列的卡片。 */
+  /** 按事件时间排列、未做语义合并的卡片。 */
   readonly cards: readonly ChainCard[]
+  /** 按事件时间排列并合并重复工作的卡片。 */
+  readonly mergedCards: readonly ChainCard[]
   /** 按严重程度排序的评审风险标记。 */
   readonly flags: readonly RiskFlag[]
   /** 卡片引用的所有 span，按日志顺序排列；展开时按序号读取它们。 */
@@ -18,7 +20,7 @@ export interface ChainSnapshot {
 }
 
 /** Session 尚未发布任何链节点时的快照。 */
-export const EMPTY_CHAIN: ChainSnapshot = { cards: [], flags: [], spans: [] }
+export const EMPTY_CHAIN: ChainSnapshot = { cards: [], mergedCards: [], flags: [], spans: [] }
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationViewSnapshotMap {

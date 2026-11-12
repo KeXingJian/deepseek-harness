@@ -64,7 +64,7 @@ const { cards, flags } = chainFromSpans(foldActivity(events))
 
 A turn's `prompt` card cites the `user/message` that recorded it; synthetic user-role injections (plugin context, recalled history, goal continuations) are not human prompts and produce no card. A step that recorded reasoning produces one `thinking` card citing its `assistant/message`; that step's tool calls become its `children`, rendered as child cards under it, and the thinking card states their counts in `actions` so one row reads "thought this, then did that". A step without reasoning leaves its tool cards in the flat chain and produces no thinking card.
 
-Cards merge while preserving review meaning: adjacent look-around cards become one counted summary, repeated edits to one file become one card with a `repeat` count, failed verifications stay standalone, and long success runs collapse. The chain is capped so a long session still fits one screen.
+`chainFromSpans(spans, userText?, diffs?, { merge: false })` returns every event card separately in event-sequence order, including thinking cards and their actions as flat rows. The default projection merges adjacent recon cards, repeated edits to one file, and long successful-verification runs, while failed verification cards remain separate; merged cards sort by their first evidence event. The default merged chain is capped to keep long sessions readable.
 
 A card title is a `ChainTitle` message descriptor — which message applies and the values it interpolates — and `meta` repeats the same facts in machine form for expansion and for the risk rules. Only `prompt`, `thinking`, and `intent` titles are recorded text. The consuming view maps each descriptor through its own locale dictionary, so the projection never writes product copy.
 
@@ -118,7 +118,7 @@ None; this package neither assembles nor sends a provider request.
 - **Prompt quotes the first human message** — `prompt` is the turn's first human `user/message`, truncated in the title and bounded in `meta`; later human interjections in the same turn stay out of the chain.
 - **Thinking is per step** — a `thinking` card carries the reasoning of one step; reasoning that arrives without an open step is dropped, and a step's actions are counted by the classification the action cards use, so an unknown tool counts as neither a file nor a search.
 - **Out-of-scope matching is a heuristic** — it compares changed paths with paths the session read and with the task text (the caller's argument, or the prompts recorded in the chain), and reports the result as an inference rather than a fact.
-- **One consumer so far** — `dsh-client-ui-agent-chain` renders these cards and flags; navigation from a card back to its evidence belongs to that view.
+- **One consumer so far** — `dsh-client-ui-agent-chain` renders these cards; the flags reach it as card status, and navigation from a card back to its evidence belongs to that view.
 - **Deletion line counts are not inferred** — a deletion reports the file, not a removed-line total the session did not record.
 - **Diffs come from the caller** — a chain folded from spans alone carries no diffs; a caller that holds the recorded tool results passes them as `chainFromSpans`'s third argument, so a tool that records no `diffs` in its result shows its facts without one.
 - **The ceiling compresses look-around cards only** — a session that changed more than thirty distinct files still renders one card per file, because collapsing distinct files would hide exactly what a reviewer must read.

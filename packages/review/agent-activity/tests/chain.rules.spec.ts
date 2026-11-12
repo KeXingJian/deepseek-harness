@@ -343,6 +343,31 @@ describe('look-around cards', () => {
 })
 
 describe('merging rules', () => {
+  it('keeps every event as a flat chronological card when merging is disabled', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { prompt: 'human request', promptSeq: 1, intent: 'first intent', intentSeq: 7 } }),
+      span(2, 'step', 'step:1:1', { attributes: { thinking: 'planning', thinkingSeq: 3 } }),
+      tool(4, 'edit', { path: 'src/a.ts' }),
+      tool(5, 'edit', { path: 'src/a.ts' }),
+      tool(6, 'grep', { pattern: 'x' }),
+    ], '', {}, { merge: false })
+
+    expect(result.cards.map(card => card.kind)).toEqual(['prompt', 'thinking', 'change', 'change', 'recon', 'intent', 'result'])
+    expect(result.cards.slice(0, 6).map(card => card.evidenceSeqs[0])).toEqual([1, 3, 4, 5, 6, 7])
+    expect(result.cards.slice(2, 4).map(card => card.repeat)).toEqual([undefined, undefined])
+    expect(result.cards[1]?.children).toBeUndefined()
+  })
+
+  it('orders merged cards by their opening event sequence', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { prompt: 'human request', promptSeq: 1, intent: 'inspect the result', intentSeq: 5 } }),
+      tool(3, 'edit', { path: 'src/a.ts' }),
+      tool(4, 'bash', { command: 'pnpm test' }),
+    ])
+
+    expect(result.cards.slice(0, 4).map(card => card.kind)).toEqual(['prompt', 'change', 'verify', 'intent'])
+  })
+
   it('merges repeated changes to one file and keeps the first position', () => {
     const result = chainFromSpans([
       tool(1, 'edit', { path: 'src/a.ts' }),

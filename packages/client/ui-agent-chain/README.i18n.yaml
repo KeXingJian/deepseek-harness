@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-agent-chain/README.md
 /:
-  en: 8bceeca3bc61911d
-  zh: 965534ec78fc32b3
+  en: 89a0aaac1502415a
+  zh: e4b095f5650db2d4
 /deepseek-ai-dsh-client-ui-agent-chain:
   en: e7a2a5d5b6244663
   zh: c21ed7dd798d490d
 /deepseek-ai-dsh-client-ui-agent-chain/summary:
-  en: ade608e2fd2eba7d
-  zh: de039d6c37bfbb4c
+  en: 5e1d0dfcfc1b5618
+  zh: 5a9563fbaf836b19
 /deepseek-ai-dsh-client-ui-agent-chain/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -18,11 +18,11 @@
   en: 95fa8206ccfc180a
   zh: 7c5f0aa22f026eb4
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/reading-the-chain:
-  en: 3a006e7c8cbd2bd4
-  zh: cb9c1d8e3f767c79
+  en: bbadac362c7ae5c5
+  zh: aa5aaf8d84f578ee
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/navigating-and-streaming-a-long-chain:
-  en: b8dd5867bb7c6b84
-  zh: dc3c1c49466342a0
+  en: 32d1bccd26154c7f
+  zh: 5d6f734c0a501cfc
 /deepseek-ai-dsh-client-ui-agent-chain/use-this-package/expanding-one-card:
   en: e45b8a575b4f76cc
   zh: 4d7155da0da10ddf
@@ -30,11 +30,11 @@
   en: f346780d5d51718c
   zh: c82cea9fae428c21
 /deepseek-ai-dsh-client-ui-agent-chain/understand-the-implementation:
-  en: 8f5bed2359f0e354
-  zh: 383f2bb163ee0c92
+  en: 35eb1c3271f024fd
+  zh: 1421b70dc19d2e75
 /deepseek-ai-dsh-client-ui-agent-chain/further-exploration:
-  en: fbd7c7ad6dd1e778
-  zh: 8c480f8cfbecefef
+  en: 7d2fddd68d87bcf1
+  zh: 49ab4f5c3903eabe
 /deepseek-ai-dsh-client-ui-agent-chain/model-experience:
   en: 98e1f1c43b404a47
   zh: d86f21d3a38db1f8
@@ -42,8 +42,8 @@
   en: 4f0eadf94828e66e
   zh: 9ab358160cac8d5e
 /deepseek-ai-dsh-client-ui-agent-chain/known-limitations-and-deferred-work:
-  en: 8808aeb8658c5098
-  zh: e8c14bfc95aa6a20
+  en: 3ef4511b440342d0
+  zh: c2e489339e03b313
 /deepseek-ai-dsh-client-ui-agent-chain/known-limitations-and-deferred-work/dev-note:
   en: 0122e5768aba7266
   zh: 76ee5ad02be1be00

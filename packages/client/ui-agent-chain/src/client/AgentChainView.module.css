@@ -3,8 +3,14 @@
    转录的宽度。 */
 
 .root {
-  --chain-rail-width: 200px;
-  --chain-gap: 12px;
+  --chain-rail-width: 56px;
+  /* 定位条与卡片列之间的间距；卡片区的宽度上限也按它算。 */
+  --chain-gap: 8px;
+  /* 读者真正看得见的带：滚动容器高度扣掉贴底的输入区，两者都由会话外壳发布。
+     定位条的中线取这条带的中线，因此它始终落在看得见的区域里。 */
+  --chain-band: calc(
+    var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-height, 152px)
+  );
   /* 卡片区宽度由这里查询：视图拿到的是会话列的宽度，而不是窗口宽度。 */
   container-type: inline-size;
   display: flex;
@@ -12,7 +18,7 @@
   flex-direction: column;
   width: 100%;
   min-width: 0;
-  /* 卡片列保持与聊天列同宽：风险栏与行内边距占用列宽之外的空间，
+  /* 卡片列保持与聊天列同宽：定位条与行内边距占用列宽之外的空间，
      窄屏时 width: 100% 先收回，不撑破会话列。 */
   max-width: min(
     100%,
@@ -20,41 +26,15 @@
   );
   margin: 0 auto;
   padding: 16px 12px 24px;
+  gap: 8px;
   color: var(--dsw-alias-label-primary);
 }
 
-/* 风险栏在左侧，卡片流在右侧；没有风险时卡片流占满整行。 */
-.board {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  min-width: 0;
-  gap: var(--chain-gap);
-}
-
-.board[data-risks='open'] {
-  grid-template-columns: var(--chain-rail-width) minmax(0, 1fr);
-}
-
-/* 收起后只剩一条窄把手，卡片流跟着让出宽度。 */
-.board[data-risks='closed'] {
-  grid-template-columns: 24px minmax(0, 1fr);
-}
-
-.main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 8px;
-}
-
-/* 筛选器与勘察显隐按钮同一行：筛选器靠左，勘察按钮贴右，不随筛选器换行漂移。 */
+/* 时间线与勘察开关属于同一组，窄列时自然换行。 */
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+  min-width: 0;
 }
 
 .filters {
@@ -70,7 +50,6 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  margin-left: auto;
   padding: 0 6px;
   border: 0;
   border-radius: 999px;
@@ -99,19 +78,22 @@
   outline-offset: 1px;
 }
 
-/* 卡片区与右侧定位条共用一行：卡片列占满剩余宽度，定位条贴在滚动容器右侧。
-   只有一张卡片时定位条没有意义，卡片列独占整行。 */
+/* 卡片区与右侧定位条共用一行：卡片列占满剩余宽度，定位条沿滚动容器右侧居中。
+   没有可引导的卡片时不渲染定位条，卡片列独占整行。 */
 .stream {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   min-width: 0;
-  gap: 8px;
+  gap: var(--chain-gap);
 }
 
 .stream[data-locator] {
-  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(0, 1fr) var(--chain-rail-width);
+  /* 粘性锚点只在自己的网格区内移动：卡片很短时把网格区垫到可见带的一半高，
+     零高锚点才够得到中线。整段内容仍短于滚动容器，所以不产生滚动余量。 */
+  min-height: max(0px, calc(var(--chain-band) / 2));
 }
 
 .column {
@@ -121,24 +103,33 @@
   gap: 4px;
 }
 
-/* 定位条的滚动区：占满卡片列的高度，让吸附中的横杠列在整列范围内移动。 */
+/* 定位条的粘性锚点：一个零高的粘性点停在可见带的中线上。
+   锚点本身不占高度，横杠列相对它居中，因此不受"粘性元素不得越过包含块底边"
+   的限制——追加新一页或滚到最底部时，横杠列都不会被顶离中线。 */
 .locatorTrack {
-  align-self: stretch;
+  position: sticky;
+  top: calc(var(--chain-band) / 2);
+  align-self: start;
+  height: 0;
   min-width: 0;
 }
 
-/* 定位条：粘在滚动容器中途，纵向排列每张顶层卡片一根横杠。
-   横杠颜色跟随卡片作用域，读者能按段扫读；比可见带更高时条内自行滚动。 */
+/* 定位条：以粘性锚点为中线，纵向排列每张被引导的卡片（提示词、改动，
+   以及折叠出改动的思考卡片）一根横杠。横杠颜色跟随卡片作用域。
+   高度上限取可见带，因此定位条始终落在读者真正看得到的区域里；
+   横杠比可见带还多时在条内自行滚动。 */
 .locator {
-  position: sticky;
-  top: 50%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  max-height: min(50vh, 420px);
+  max-height: min(max(0px, calc(var(--chain-band) - 64px)), 840px);
   overflow-y: auto;
-  padding: 4px 0;
-  gap: 1px;
+  padding: 8px 0;
+  gap: 2px;
   scrollbar-width: none;
   transform: translateY(-50%);
 }
@@ -148,11 +139,12 @@
 }
 
 .locatorBar {
-  width: 20px;
-  height: 4px;
+  flex: none;
+  width: 40px;
+  height: 8px;
   padding: 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: 4px;
   background: var(--dsw-alias-border-l4);
   cursor: pointer;
   transform: scaleX(0.6);
@@ -164,22 +156,10 @@
   background: var(--dsw-alias-state-business-primary);
 }
 
+/* 思考卡片只有在折叠出改动时才上定位条，用与改动同族的琥珀色。 */
 .locatorBar[data-kind='thinking'],
-.locatorBar[data-kind='intent'] {
-  background: var(--dsw-alias-state-done-primary);
-}
-
-.locatorBar[data-kind='change'],
-.locatorBar[data-kind='interrupt'] {
+.locatorBar[data-kind='change'] {
   background: var(--dsw-alias-state-warn-primary);
-}
-
-.locatorBar[data-kind='verify'] {
-  background: var(--dsw-alias-state-success-primary);
-}
-
-.locatorBar[data-kind='result'] {
-  background: var(--dsw-alias-label-primary);
 }
 
 @media (hover: hover) {
@@ -235,168 +215,6 @@
 
   .locator {
     display: none;
-  }
-}
-
-/* 风险栏：粘在滚动容器上沿，卡片流滚动时评审者仍能读到风险。 */
-.risks {
-  position: sticky;
-  top: 8px;
-  display: flex;
-  box-sizing: border-box;
-  flex-direction: column;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-2);
-  gap: 4px;
-}
-
-.risksHead {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 4px;
-  color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-xxs-12);
-}
-
-/* 风险栏本身是警示面，用警告墨色而非正文墨色领头。 */
-.risksGlyph {
-  flex: none;
-  color: var(--dsw-alias-state-warn-primary);
-}
-
-.risksTitle {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow-wrap: anywhere;
-}
-
-.risksToggle {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--dsw-radius-xs);
-  color: var(--dsw-alias-label-tertiary);
-  background: transparent;
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .risksToggle:hover {
-    color: var(--dsw-alias-label-primary);
-    background: var(--dsw-alias-interactive-bg-hover);
-  }
-}
-
-.risksToggle:focus-visible {
-  outline-offset: 1px;
-}
-
-/* 收起状态只剩一条竖排把手，点击即展开；宽度与收起列一致。 */
-.risksHandle {
-  position: sticky;
-  top: 8px;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-self: start;
-  box-sizing: border-box;
-  width: 24px;
-  padding: 6px 0;
-  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent);
-  border-radius: var(--dsw-radius-md);
-  color: var(--dsw-alias-state-warn-label);
-  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent);
-  gap: 4px;
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .risksHandle:hover {
-    background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 14%, transparent);
-  }
-}
-
-.risksHandle:focus-visible {
-  outline-offset: 1px;
-}
-
-.risksHandleCount {
-  color: inherit;
-  font: var(--dsw-font-xxs-12);
-}
-
-.riskCount {
-  flex: none;
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxs-12);
-}
-
-.riskList {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  gap: 6px;
-  list-style: none;
-}
-
-.riskItem {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  min-width: 0;
-  gap: 4px 6px;
-  font: var(--dsw-font-xs-13);
-}
-
-/* 高危项左侧加一道色条，纵向扫读时先看到阻断项。 */
-.riskItem[data-severity='danger'] {
-  padding-left: 6px;
-  box-shadow: inset 2px 0 0 var(--dsw-alias-state-error-primary);
-}
-
-.riskReason {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--dsw-alias-label-primary);
-  font: var(--dsw-font-xxs-12);
-}
-
-.riskFiles {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxs-12);
-}
-
-/* 视图列变窄时风险栏回到列表上方，横向空间留给卡片。 */
-@container (max-width: 800px) {
-  .board[data-risks='open'],
-  .board[data-risks='closed'] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .risks,
-  .risksHandle {
-    position: static;
-  }
-
-  .risksHandle {
-    flex-direction: row;
-    width: auto;
-    justify-self: start;
-    padding: 4px 8px;
   }
 }
 

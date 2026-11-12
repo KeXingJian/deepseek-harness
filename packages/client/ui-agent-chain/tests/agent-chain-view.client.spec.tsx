@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /**
- * Review-chain view: the waiting state, card rows, per-card disclosure, the
- * three filters, the risk banner, and the review links a card offers.
+ * Review-chain view: waiting state, card rows, per-card disclosure, timeline controls,
+ * the guided-card locator, and the review links a card offers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import type { ActivitySpan, ChainCard, ChainTitle, RiskFlag } from '@deepseek-ai/dsh-agent-activity'
+import type { ActivitySpan, ChainCard, ChainTitle } from '@deepseek-ai/dsh-agent-activity'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
@@ -48,11 +48,6 @@ function change(path: string): ChainCard {
   return card({ kind: 'change', title: { copy: 'change', op: 'update', path } })
 }
 
-/** One failing verification card. */
-function failedVerify(command: string): ChainCard {
-  return card({ kind: 'verify', title: { copy: 'verifyFailed', command }, status: 'error' })
-}
-
 /** One contributing span as the Definition publishes it. */
 function span(
   seq: number,
@@ -66,17 +61,14 @@ function span(
 /** Optional collaborators a test drives instead of the real Session shell. */
 interface ViewOptions {
   readonly spans?: readonly ActivitySpan[]
+  readonly mergedCards?: readonly ChainCard[]
   readonly openFile?: (path: string) => void
   readonly inspectCall?: (callId: string) => void
 }
 
 /** Render the view over one fixed snapshot. */
-function renderView(
-  cards: readonly ChainCard[],
-  flags: readonly RiskFlag[] = [],
-  options: ViewOptions = {},
-) {
-  const chain: ChainSnapshot = { cards, flags, spans: options.spans ?? [] }
+function renderView(cards: readonly ChainCard[], options: ViewOptions = {}) {
+  const chain: ChainSnapshot = { cards, mergedCards: options.mergedCards ?? cards, flags: [], spans: options.spans ?? [] }
   const useChain: AgentChainViewProps['useChain'] = selector => selector(chain)
   const useSessions: AgentChainViewProps['useSessions'] = selector => selector(NO_SESSIONS)
   return render(
@@ -153,7 +145,7 @@ describe('card disclosure', () => {
   const spans = [span(12, 'write'), span(18, 'bash', 'error')]
 
   it('reveals the recorded facts and evidence on demand', () => {
-    renderView([card_], [], { spans })
+    renderView([card_], { spans })
     const toggle = screen.getByRole('button', { name: 'Show evidence' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByText('src/a.ts')).toBeNull()
@@ -169,7 +161,7 @@ describe('card disclosure', () => {
   })
 
   it('hides the facts again when toggled off', () => {
-    renderView([card_], [], { spans })
+    renderView([card_], { spans })
     fireEvent.click(screen.getByRole('button', { name: 'Show evidence' }))
     fireEvent.click(screen.getByRole('button', { name: 'Hide evidence' }))
     expect(screen.queryByText('src/a.ts')).toBeNull()
@@ -255,7 +247,6 @@ describe('review links', () => {
     const openFile = vi.fn()
     renderView(
       [card({ kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' }, meta: { path: 'src/a.ts' } })],
-      [],
       { openFile },
     )
     fireEvent.click(screen.getByRole('button', { name: 'Show evidence' }))
@@ -263,20 +254,10 @@ describe('review links', () => {
     expect(openFile).toHaveBeenCalledWith('src/a.ts')
   })
 
-  it('opens a file named by a risk flag', () => {
-    const openFile = vi.fn()
-    renderView([change('a.ts')], [
-      { code: 'touches-tests', severity: 'danger', reason: { copy: 'touchesTests' }, evidenceFiles: ['tests/a.spec.ts'] },
-    ], { openFile })
-    fireEvent.click(screen.getByRole('button', { name: 'Open in preview tests/a.spec.ts' }))
-    expect(openFile).toHaveBeenCalledWith('tests/a.spec.ts')
-  })
-
   it('opens a cited tool call in the view that inspects calls', () => {
     const inspectCall = vi.fn()
     renderView(
       [card({ kind: 'verify', title: { copy: 'verifyPassed', command: 'go test' }, evidenceSeqs: [7] })],
-      [],
       { spans: [span(7, 'bash', 'ok', { callId: 'call-7' })], inspectCall },
     )
     fireEvent.click(screen.getByRole('button', { name: 'Show evidence' }))
@@ -287,7 +268,6 @@ describe('review links', () => {
   it('leaves a cited span inert without a call identity or an inspector', () => {
     renderView(
       [card({ kind: 'intent', title: { copy: 'intent', text: 'inspect the catalog module' }, evidenceSeqs: [3, 4] })],
-      [],
       {
         spans: [span(3, 'turn:1'), span(4, 'bash', 'ok', { callId: 'call-4' })],
         inspectCall: vi.fn(),
@@ -300,79 +280,23 @@ describe('review links', () => {
   })
 })
 
-describe('filters', () => {
-  const cards = [intent('inspect the catalog module'), change('a.ts'), failedVerify('go test')]
+describe('timeline controls', () => {
+  it('labels the alternate timeline mode and keeps both controls on the left', () => {
+    const chronological = [intent('first event'), change('a.ts')]
+    const merged = [intent('merged event')]
+    renderView(chronological, { mergedCards: merged })
+    const controls = screen.getByRole('group', { name: 'Execution chain controls' })
+    const merge = within(controls).getByRole('button', { name: 'Show merged events' })
+    expect(merge.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText('first event')).toBeTruthy()
+    expect(screen.queryByText('merged event')).toBeNull()
+    expect(within(controls).getAllByRole('button')).toHaveLength(2)
 
-  it('starts on the complete chain', () => {
-    renderView(cards)
-    expect(screen.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByText('go test failed')).toBeTruthy()
-  })
-
-  it('keeps only changes', () => {
-    renderView(cards)
-    fireEvent.click(screen.getByRole('button', { name: 'Changes only' }))
-    expect(screen.getByText('a.ts modified')).toBeTruthy()
-    expect(screen.queryByText('go test failed')).toBeNull()
-  })
-
-  it('keeps only risky cards', () => {
-    renderView(cards)
-    fireEvent.click(screen.getByRole('button', { name: 'Risks only' }))
-    expect(screen.getByText('go test failed')).toBeTruthy()
-    expect(screen.queryByText('inspect the catalog module')).toBeNull()
-  })
-
-  it('explains an empty selection', () => {
-    renderView([intent('inspect the catalog module')])
-    fireEvent.click(screen.getByRole('button', { name: 'Risks only' }))
-    expect(screen.getByText('Nothing matches this filter')).toBeTruthy()
-  })
-})
-
-describe('risk rail', () => {
-  const flags: readonly RiskFlag[] = [
-    { code: 'touches-tests', severity: 'danger', reason: { copy: 'touchesTests' }, evidenceFiles: ['tests/a.spec.ts'] },
-    { code: 'out-of-scope', severity: 'info', reason: { copy: 'outOfScope' }, evidenceFiles: [] },
-  ]
-
-  it('lists each risk with its severity, reason, and files', () => {
-    renderView([change('a.ts')], flags)
-    expect(screen.getByLabelText('Review risks')).toBeTruthy()
-    expect(screen.getByText('Blocker')).toBeTruthy()
-    expect(screen.getByText('Changed test files')).toBeTruthy()
-    expect(screen.getByText('tests/a.spec.ts')).toBeTruthy()
-    expect(screen.getByText('Note')).toBeTruthy()
-    expect(screen.getByText('These files appear in no task description or exploration (inferred)')).toBeTruthy()
-  })
-
-  it('renders no rail without risks', () => {
-    renderView([change('a.ts')])
-    expect(screen.queryByLabelText('Review risks')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Show risks' })).toBeNull()
-  })
-
-  it('collapses to a count handle and expands again on demand', () => {
-    renderView([change('a.ts')], flags)
-    const hide = screen.getByRole('button', { name: 'Hide risks' })
-    expect(hide.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.click(hide)
-    expect(screen.queryByLabelText('Review risks')).toBeNull()
-    expect(screen.queryByText('Changed test files')).toBeNull()
-    const show = screen.getByRole('button', { name: 'Show risks' })
-    expect(show.getAttribute('aria-expanded')).toBe('false')
-    expect(show.textContent).toBe('2')
-    fireEvent.click(show)
-    expect(screen.getByLabelText('Review risks')).toBeTruthy()
-    expect(screen.getByText('Changed test files')).toBeTruthy()
-  })
-
-  it('keeps the collapsed state independent of the card filters', () => {
-    renderView([intent('inspect the catalog module'), change('a.ts')], flags)
-    fireEvent.click(screen.getByRole('button', { name: 'Hide risks' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Changes only' }))
-    expect(screen.getByRole('button', { name: 'Show risks' })).toBeTruthy()
-    expect(screen.getByText('a.ts modified')).toBeTruthy()
+    fireEvent.click(merge)
+    expect(screen.getByText('merged event')).toBeTruthy()
+    expect(screen.queryByText('first event')).toBeNull()
+    const chronologicalToggle = within(controls).getByRole('button', { name: 'Show events chronologically' })
+    expect(chronologicalToggle.getAttribute('aria-pressed')).toBe('true')
   })
 })
 
@@ -398,12 +322,17 @@ describe('recon visibility', () => {
 })
 
 describe('card locator', () => {
-  /** A chain long enough to reach past the rendered page. */
-  function manyCards(count: number): ChainCard[] {
+  /** One prompt card; the reader's own words are the first thing the rail guides. */
+  function prompt(text: string): ChainCard {
+    return card({ id: 'prompt:0', kind: 'prompt', title: { copy: 'prompt', text } })
+  }
+
+  /** A chain of changes long enough to reach past the rendered page. */
+  function manyChanges(count: number): ChainCard[] {
     return Array.from({ length: count }, (_entry, index) => card({
-      id: `intent:${String(index)}`,
-      kind: 'intent',
-      title: { copy: 'intent', text: `step ${String(index)}` },
+      id: `change:${String(index)}`,
+      kind: 'change',
+      title: { copy: 'change', op: 'update', path: `f${String(index)}.ts` },
     }))
   }
 
@@ -414,31 +343,59 @@ describe('card locator', () => {
   })
   afterEach(() => { scrollIntoView.mockClear() })
 
-  it('offers one bar per rendered card and jumps to the chosen one', () => {
-    renderView([intent('inspect the catalog module'), change('a.ts')])
+  it('guides only the prompt and change cards', () => {
+    renderView([prompt('fix the redirect'), intent('inspect the catalog module'), change('a.ts')])
     const rail = screen.getByLabelText('Jump between chain cards')
     const bars = within(rail).getAllByRole('button')
     expect(bars.map(bar => bar.getAttribute('aria-label'))).toEqual([
-      'Jump to inspect the catalog module',
+      'Jump to fix the redirect',
       'Jump to a.ts modified',
     ])
     fireEvent.click(bars[1] as HTMLElement)
     expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="change:1"]'))
   })
 
+  it('guides a thinking card only when it folds out a change', () => {
+    const withChange = card({
+      id: 'thinking:1',
+      kind: 'thinking',
+      title: { copy: 'thinking', text: 'start with the router' },
+      children: [card({
+        id: 'change:2',
+        kind: 'change',
+        title: { copy: 'change', op: 'update', path: 'src/a.ts' },
+      })],
+    })
+    const withoutChange = card({
+      id: 'thinking:3',
+      kind: 'thinking',
+      title: { copy: 'thinking', text: 'keep reading' },
+      children: [card({ id: 'recon:4', kind: 'recon', title: { copy: 'recon', files: 1, searches: 0 } })],
+    })
+    renderView([prompt('fix the redirect'), withChange, withoutChange])
+    const rail = screen.getByLabelText('Jump between chain cards')
+    expect(within(rail).getAllByRole('button').map(bar => bar.getAttribute('aria-label')))
+      .toEqual(['Jump to fix the redirect', 'Jump to start with the router'])
+  })
+
+  it('renders no rail when nothing guides', () => {
+    renderView([intent('inspect the catalog module')])
+    expect(screen.queryByLabelText('Jump between chain cards')).toBeNull()
+  })
+
   it('renders the rest of the chain when the reader asks for more', () => {
-    renderView(manyCards(45))
-    expect(screen.queryByText('step 44')).toBeNull()
+    renderView(manyChanges(45))
+    expect(screen.queryByText('f44.ts modified')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show more cards (40/45)' }))
-    expect(screen.getByText('step 44')).toBeTruthy()
+    expect(screen.getByText('f44.ts modified')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show more cards (40/45)' })).toBeNull()
   })
 
   it('renders through a distant card the reader jumps to', () => {
-    renderView(manyCards(45))
-    fireEvent.click(screen.getByRole('button', { name: 'Jump to step 44' }))
-    expect(screen.getByText('step 44')).toBeTruthy()
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="intent:44"]'))
+    renderView(manyChanges(45))
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to f44.ts modified' }))
+    expect(screen.getByText('f44.ts modified')).toBeTruthy()
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="change:44"]'))
   })
 
   it('marks the bar of the card the reader is looking at', () => {
@@ -457,8 +414,10 @@ describe('card locator', () => {
 
       takeRecords(): IntersectionObserverEntry[] { return [] }
     })
-    renderView([intent('inspect the catalog module'), change('a.ts')])
+    renderView([prompt('fix the redirect'), intent('inspect the catalog module'), change('a.ts')])
     const observer = observers[0]!
+    // Only the guided rows are observed, so a bar index never counts skipped cards.
+    expect(observer.targets).toHaveLength(2)
     const row = document.querySelector('[data-card-id="change:1"]')!
     act(() => {
       observer.callback([{ target: row, isIntersecting: true } as IntersectionObserverEntry], observer as never)
