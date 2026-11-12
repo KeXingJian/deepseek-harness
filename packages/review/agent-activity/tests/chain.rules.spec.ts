@@ -380,6 +380,18 @@ describe('merging rules', () => {
     ])
   })
 
+  it('keeps one edit card per prompt so a change stays between two prompts', () => {
+    const result = chainFromSpans([
+      span(1, 'turn', 'turn:1', { attributes: { prompt: 'first request', promptSeq: 1 } }),
+      tool(2, 'edit', { path: 'src/a.ts' }),
+      span(4, 'turn', 'turn:2', { attributes: { prompt: 'second request', promptSeq: 4 } }),
+      tool(5, 'edit', { path: 'src/a.ts' }),
+    ])
+    expect(result.cards.map(card => card.id)).toEqual(['prompt:1', 'change:2', 'prompt:4', 'change:5', 'result:end'])
+    expect(result.cards[1]).toMatchObject({ kind: 'change', evidenceSeqs: [2] })
+    expect(result.cards[3]).toMatchObject({ kind: 'change', evidenceSeqs: [5] })
+  })
+
   it('folds three or more successful verifications', () => {
     const result = chainFromSpans([
       tool(1, 'bash', { command: 'a' }),

@@ -618,11 +618,21 @@ function isNoteSource(value: unknown): value is NoteSource {
   return value === 'file' || value === 'step' || value === 'intent'
 }
 
-/** 合并指向同一文件的变更卡片；合并后的卡片保留首次编辑的位置。 */
+/**
+ * 合并指向同一文件的变更卡片；合并后的卡片保留首次编辑的位置。
+ *
+ * 合并范围止于人类提示词。跨提示词按路径合并会把后一段工作的改动搬到前一段的位置，
+ * 于是两条提示词之间发生的改动从它们中间消失，读者在链与定位条上都看不到。
+ */
 function mergeChanges(cards: readonly ChainCard[]): ChainCard[] {
   const positions = new Map<string, number>()
   const out: ChainCard[] = []
   for (const card of cards) {
+    if (card.kind === 'prompt') {
+      positions.clear()
+      out.push(card)
+      continue
+    }
     if (card.kind !== 'change') {
       out.push(card)
       continue

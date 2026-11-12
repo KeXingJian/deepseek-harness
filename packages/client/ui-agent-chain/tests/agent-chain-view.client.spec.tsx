@@ -343,16 +343,21 @@ describe('card locator', () => {
   })
   afterEach(() => { scrollIntoView.mockClear() })
 
-  it('guides only the prompt and change cards', () => {
-    renderView([prompt('fix the redirect'), intent('inspect the catalog module'), change('a.ts')])
+  it('keeps a change between two user prompts in the locator rail', () => {
+    renderView([
+      card({ id: 'prompt:1', kind: 'prompt', title: { copy: 'prompt', text: 'first request' }, evidenceSeqs: [1] }),
+      card({ id: 'change:3', kind: 'change', title: { copy: 'change', op: 'update', path: 'a.ts' }, evidenceSeqs: [3] }),
+      card({ id: 'prompt:5', kind: 'prompt', title: { copy: 'prompt', text: 'follow-up request' }, evidenceSeqs: [5] }),
+    ])
     const rail = screen.getByLabelText('Jump between chain cards')
     const bars = within(rail).getAllByRole('button')
     expect(bars.map(bar => bar.getAttribute('aria-label'))).toEqual([
-      'Jump to fix the redirect',
+      'Jump to first request',
       'Jump to a.ts modified',
+      'Jump to follow-up request',
     ])
     fireEvent.click(bars[1] as HTMLElement)
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="change:1"]'))
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.querySelector('[data-card-id="change:3"]'))
   })
 
   it('guides a thinking card only when it folds out a change', () => {

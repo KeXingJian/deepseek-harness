@@ -69,26 +69,36 @@ function row(id: string, scrollIntoView: () => void): HTMLElement {
 }
 
 describe('locatorBars', () => {
-  it('keeps prompt and change bars in event order with their list indexes', () => {
+  it('preserves card order while skipping unguided cards', () => {
     const bars = locatorBars([
       { ...card('change:2', 'change', 'a.ts modified'), evidenceSeqs: [2] },
       card('intent:1', 'intent', 'inspect the catalog'),
       { ...card('prompt:0', 'prompt', 'fix the redirect'), evidenceSeqs: [1] },
     ], t, path => path)
     expect(bars).toEqual([
-      { id: 'prompt:0', kind: 'prompt', title: 'fix the redirect', index: 2 },
       { id: 'change:2', kind: 'change', title: 'a.ts modified', index: 0 },
+      { id: 'prompt:0', kind: 'prompt', title: 'fix the redirect', index: 2 },
     ])
   })
 
-  it('orders prompt and change bars together by evidence sequence', () => {
+  it('preserves card order so changes stay between prompts', () => {
     const bars = locatorBars([
-      { ...card('change:30', 'change', 'later.ts'), evidenceSeqs: [30] },
-      { ...card('prompt:5', 'prompt', 'fix the redirect'), evidenceSeqs: [5] },
-      { ...card('change:20', 'change', 'earlier.ts'), evidenceSeqs: [20] },
+      { ...card('prompt:1', 'prompt', 'first request'), evidenceSeqs: [1] },
+      { ...card('change:3', 'change', 'a.ts modified'), evidenceSeqs: [3] },
+      { ...card('prompt:5', 'prompt', 'follow-up request'), evidenceSeqs: [5] },
     ], t, path => path)
-    expect(bars.map(bar => bar.id)).toEqual(['prompt:5', 'change:20', 'change:30'])
-    expect(bars.map(bar => bar.index)).toEqual([1, 2, 0])
+    expect(bars.map(bar => bar.id)).toEqual(['prompt:1', 'change:3', 'prompt:5'])
+    expect(bars.map(bar => bar.index)).toEqual([0, 1, 2])
+  })
+
+  it('does not reorder guided cards by their kinds or evidence sequence', () => {
+    const bars = locatorBars([
+      { ...card('prompt:5', 'prompt', 'follow-up request'), evidenceSeqs: [5] },
+      { ...card('change:3', 'change', 'a.ts modified'), evidenceSeqs: [3] },
+      { ...card('prompt:1', 'prompt', 'first request'), evidenceSeqs: [1] },
+    ], t, path => path)
+    expect(bars.map(bar => bar.id)).toEqual(['prompt:5', 'change:3', 'prompt:1'])
+    expect(bars.map(bar => bar.index)).toEqual([0, 1, 2])
   })
 
   it('keeps a thinking card that folds out a change and drops one that folds out only recon', () => {

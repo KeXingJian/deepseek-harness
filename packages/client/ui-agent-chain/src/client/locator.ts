@@ -38,7 +38,7 @@ function isGuided(card: ChainCard): boolean {
 }
 
 /**
- * 先筛出提示词、改动及包含改动的思考卡，再按首个依据事件序号排序横杠。
+ * 从卡片列表中筛出提示词、改动及包含改动的思考卡，并保留它们的列表顺序。
  * @param cards - 筛选后的顶层卡片。
  * @param t - 评审链翻译器。
  * @param label - 把卡片里的文件路径改写为展示文本。
@@ -49,12 +49,9 @@ export function locatorBars(
   t: ChainTranslate,
   label: ChainPathLabel,
 ): readonly ChainLocatorBar[] {
-  return cards
-    .flatMap((card, index) => (isGuided(card)
-      ? [{ id: card.id, kind: card.kind, title: cardTitle(card, t, label), index, seq: card.evidenceSeqs[0] ?? Number.MAX_SAFE_INTEGER }]
-      : []))
-    .sort((left, right) => left.seq - right.seq || left.index - right.index)
-    .map(({ id, kind, title, index }) => ({ id, kind, title, index }))
+  return cards.flatMap((card, index) => (isGuided(card)
+    ? [{ id: card.id, kind: card.kind, title: cardTitle(card, t, label), index }]
+    : []))
 }
 
 /**
