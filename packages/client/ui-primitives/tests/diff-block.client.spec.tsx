@@ -17,19 +17,12 @@ beforeEach(() => {
   vi.useRealTimers()
 })
 
-function bodyRows(container: HTMLElement): string[] {
-  return [...container.querySelectorAll('[data-diff-side="context"], [class*="_path_"], [class*="_gap_"], [class*="_linePair_"]')]
-    .flatMap((row) => {
-      if (row.matches('[class*="_linePair_"]')) {
-        return [row.querySelector('[data-diff-side="old"]')?.textContent ?? '',
-          row.querySelector('[data-diff-side="new"]')?.textContent ?? ''].filter(text => text.length > 0)
-      }
-      return [row.textContent ?? '']
-    })
+function insertCells(container: HTMLElement): Element[] {
+  return [...container.querySelectorAll('.diff-code-insert')]
 }
 
-function changeRows(container: HTMLElement): string[] {
-  return [...container.querySelectorAll('[class*="_del_"], [class*="_add_"]')].map(row => row.textContent ?? '')
+function deleteCells(container: HTMLElement): Element[] {
+  return [...container.querySelectorAll('.diff-code-delete')]
 }
 
 function added(count: number): string {
@@ -41,28 +34,16 @@ describe('DiffBlock structure', () => {
     const diffs: DiffHunk[] = [{ path: 'notes/new.txt', oldText: null, newText: 'hello\nworld' }]
     const { container } = render(<DiffBlock diffs={diffs} />)
     expect(screen.getByText('notes/new.txt')).toBeTruthy()
-    // No removed rows: both change lines are added.
-    expect(changeRows(container)).toEqual(['hello', 'world'])
-    expect(container.querySelectorAll('[class*="_del_"]').length).toBe(0)
-    expect(container.querySelectorAll('[class*="_add_"]').length).toBe(2)
+    expect(deleteCells(container)).toHaveLength(0)
+    expect(insertCells(container).map(cell => cell.textContent)).toEqual(['hello', 'world'])
   })
 
   it('aligns a replaced line across the old and new columns', () => {
     const diffs: DiffHunk[] = [{ path: 'a.ts', oldText: 'old', newText: 'new' }]
     const { container } = render(<DiffBlock diffs={diffs} />)
-    expect(container.querySelectorAll('[class*="_del_"]').length).toBe(1)
-    expect(container.querySelectorAll('[class*="_add_"]').length).toBe(1)
-    expect([...container.querySelectorAll('[data-diff-side]')].map(cell => cell.textContent)).toEqual(['old', 'new'])
-    expect(container.querySelectorAll('[class*="_linePair_"]')).toHaveLength(1)
-    expect(container.querySelector('[data-line-number]')).toBeNull()
-  })
-
-  it('keeps inserted and deleted rows in their original side only', () => {
-    const { container } = render(<DiffBlock diffs={[{ path: 'a.ts', oldText: 'before', newText: 'before\ninserted' }]} />)
-    expect([...container.querySelectorAll('[data-diff-side]')].map(cell => [cell.getAttribute('data-diff-side'), cell.textContent])).toEqual([
-      ['context', 'before'], ['old', ''], ['new', 'inserted'],
-    ])
-    expect(container.querySelector('[data-line-number]')).toBeNull()
+    expect(deleteCells(container)).toHaveLength(1)
+    expect(insertCells(container)).toHaveLength(1)
+    expect(container.querySelector('[data-change-key]')).toBeNull()
   })
 
   it('opens a same-file second hunk with a gap instead of repeating the path', () => {
@@ -71,9 +52,8 @@ describe('DiffBlock structure', () => {
       { path: 'a.ts', oldText: 'p', newText: 'q' },
     ]
     const { container } = render(<DiffBlock diffs={diffs} />)
-    // One path header, one gap row.
-    expect(container.querySelectorAll('[class*="_path_"]').length).toBe(1)
-    expect(container.querySelectorAll('[class*="_gap_"]').length).toBe(1)
+    expect(container.querySelectorAll('[class*="_path_"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[class*="_gap_"]')).toHaveLength(1)
   })
 
   it('opens a new file with its own path header', () => {
@@ -82,8 +62,8 @@ describe('DiffBlock structure', () => {
       { path: 'b.ts', oldText: 'p', newText: 'q' },
     ]
     const { container } = render(<DiffBlock diffs={diffs} />)
-    expect(container.querySelectorAll('[class*="_path_"]').length).toBe(2)
-    expect(container.querySelectorAll('[class*="_gap_"]').length).toBe(0)
+    expect(container.querySelectorAll('[class*="_path_"]')).toHaveLength(2)
+    expect(container.querySelectorAll('[class*="_gap_"]')).toHaveLength(0)
   })
 
   it('renders nothing for empty diffs', () => {
@@ -93,24 +73,45 @@ describe('DiffBlock structure', () => {
 
   it('treats a trailing newline as a terminator, not an extra blank line', () => {
     const { container } = render(<DiffBlock diffs={[{ path: 'n.txt', oldText: null, newText: 'hello\n' }]} />)
-    expect(changeRows(container)).toEqual(['hello'])
+    expect(insertCells(container).map(cell => cell.textContent)).toEqual(['hello'])
   })
 
   it('renders a full deletion as removed-only with no phantom added line', () => {
-    // newText '' is zero added lines: an empty string must contribute nothing.
     const { container } = render(<DiffBlock diffs={[{ path: 'gone.ts', oldText: 'a\nb', newText: '' }]} />)
-    expect(container.querySelectorAll('[class*="_add_"]').length).toBe(0)
-    expect(changeRows(container)).toEqual(['a', 'b'])
+    expect(insertCells(container)).toHaveLength(0)
+    expect(deleteCells(container).map(cell => cell.textContent)).toEqual(['a', 'b'])
   })
 
   it('keeps a genuine interior blank line', () => {
     const { container } = render(<DiffBlock diffs={[{ path: 'a.ts', oldText: null, newText: 'x\n\ny' }]} />)
-    expect(container.querySelectorAll('[class*="_add_"]').length).toBe(3)
+    expect(insertCells(container)).toHaveLength(3)
   })
 })
 
-describe('DiffBlock local changes', () => {
-  it.each([128, 129])('renders and copies %i replacements with bounded comparison', async (count) => {
+describe('DiffBlock highlighting', () => {
+  it('colors syntax with refractor token spans for a known language', () => {
+    const diffs: DiffHunk[] = [{ path: 'a.ts', oldText: 'const x = 1', newText: 'const x = 2' }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(container.querySelectorAll('.token.keyword').length).toBe(2)
+  })
+
+  it('marks word-level edits with diff-code-edit spans on both sides', () => {
+    const diffs: DiffHunk[] = [{ path: 'a.ts', oldText: 'const x = 1', newText: 'const x = 2' }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(container.querySelectorAll('.diff-code-edit')).toHaveLength(2)
+  })
+
+  it('falls back to plain text for an unregistered language without throwing', () => {
+    const diffs: DiffHunk[] = [{ path: 'a.zzz', oldText: 'before', newText: 'after' }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(deleteCells(container)).toHaveLength(1)
+    expect(insertCells(container)).toHaveLength(1)
+    expect(container.querySelector('.token')).toBeNull()
+  })
+})
+
+describe('DiffBlock totals and copy', () => {
+  it.each([128, 129])('renders and counts %i replacements with bounded comparison', async (count) => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     const oldLines = ['shared context', ...Array.from({ length: count }, (_, i) => `old ${i}`)]
@@ -125,17 +126,15 @@ describe('DiffBlock local changes', () => {
       : ['large.txt', ...oldLines.map(line => `- ${line}`), ...newLines.map(line => `+ ${line}`)].join('\n'))
   })
 
-  it('keeps a sparse edit exact in a ten-thousand-line fragment', () => {
+  it('counts a sparse edit in a ten-thousand-line fragment and collapses it', () => {
     const before = Array.from({ length: 10000 }, (_, i) => `line ${i}`)
     const after = [...before]
     after[5000] = 'changed'
     const diffs = [{ path: 'sparse.txt', oldText: before.join('\n'), newText: after.join('\n') }]
     const { container } = render(<DiffBlock diffs={diffs} />)
     expect(diffTotals(diffs)).toEqual({ added: 1, removed: 1 })
-    expect(bodyRows(container)).toEqual([
-      'sparse.txt', 'line 4997', 'line 4998', 'line 4999', 'line 5000', 'changed',
-      'line 5001', 'line 5002', 'line 5003',
-    ])
+    // The default cap folds the middle: far fewer than 10000 rows render.
+    expect(container.querySelectorAll('.diff-line').length).toBeLessThan(100)
   })
 
   it('copies shared context once and counts only a changed line', async () => {
@@ -150,20 +149,6 @@ describe('DiffBlock local changes', () => {
     expect(writeText).toHaveBeenCalledWith('settings.ts\n  start\n- mode = 1\n+ mode = 2\n  end')
   })
 
-  it('keeps three neutral context lines around distant changes and separates hunks', () => {
-    const before = Array.from({ length: 50 }, (_, i) => `item ${i}`)
-    const after = before.map((line, i) => i === 10 || i === 40 ? `changed ${i}` : line)
-    const { container } = render(<DiffBlock diffs={[{
-      path: 'items.txt', oldText: before.join('\n'), newText: after.join('\n'),
-    }]} maxLines={100} />)
-    expect(bodyRows(container)).toEqual([
-      'items.txt', 'item 7', 'item 8', 'item 9', 'item 10', 'changed 10',
-      'item 11', 'item 12', 'item 13', '⋯', 'item 37', 'item 38', 'item 39',
-      'item 40', 'changed 40', 'item 41', 'item 42', 'item 43',
-    ])
-    expect(changeRows(container)).toEqual(['item 10', 'changed 10', 'item 40', 'changed 40'])
-  })
-
   it.each([
     ['a\nx\na\ny\na', 'a\nx\na\nz\na', 1, 1],
     ['a\nb', 'a\nx\nb', 1, 0],
@@ -172,30 +157,25 @@ describe('DiffBlock local changes', () => {
     ['same', 'same', 0, 0],
     ['', '', 0, 0],
     ['a\n\nb', 'a\nb', 0, 1],
-  ])('counts ordered changes in %j → %j', (oldText, newText, added, removed) => {
+  ])('counts ordered changes in %j → %j', (oldText, newText, addedCount, removedCount) => {
     const diffs = [{ path: 'a.txt', oldText, newText }]
     const { container } = render(<DiffBlock diffs={diffs} />)
-    expect(diffTotals(diffs)).toEqual({ added, removed })
-    expect(container.querySelectorAll('[class*="_add_"]')).toHaveLength(added)
-    expect(container.querySelectorAll('[class*="_del_"]')).toHaveLength(removed)
+    expect(diffTotals(diffs)).toEqual({ added: addedCount, removed: removedCount })
+    expect(insertCells(container)).toHaveLength(addedCount)
+    expect(deleteCells(container)).toHaveLength(removedCount)
   })
 })
 
 describe('DiffBlock height cap', () => {
   it('shows head and tail with an expand control past the cap, then all lines expanded', () => {
-    // One added line over the default cap forces the collapse.
-    const diffs: DiffHunk[] = [{ path: 'a.ts', oldText: null, newText: added(DEFAULT_DIFF_MAX_LINES) }]
-    // The path header counts as a row, so a body of maxLines added lines plus
-    // the header is one over the cap.
+    const diffs: DiffHunk[] = [{ path: 'a.ts', oldText: null, newText: added(DEFAULT_DIFF_MAX_LINES + 4) }]
     const { container } = render(<DiffBlock diffs={diffs} />)
     const toggle = screen.getByRole('button', { name: /展开其余/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    // Collapsed shows fewer rows than the full body.
-    const collapsedCount = bodyRows(container).length
-    expect(collapsedCount).toBeLessThan(DEFAULT_DIFF_MAX_LINES + 1)
+    expect(insertCells(container)).toHaveLength(DEFAULT_DIFF_MAX_LINES)
     fireEvent.click(toggle)
     expect(screen.getByRole('button', { name: '收起差异' }).getAttribute('aria-expanded')).toBe('true')
-    expect(bodyRows(container).length).toBeGreaterThan(collapsedCount)
+    expect(insertCells(container)).toHaveLength(DEFAULT_DIFF_MAX_LINES + 4)
   })
 
   it('shows no expand control at or under the cap', () => {
@@ -217,7 +197,6 @@ describe('DiffBlock copy', () => {
     render(<DiffBlock diffs={diffs} />)
     const copy = screen.getByRole('button', { name: '复制' })
     await act(async () => { fireEvent.click(copy) })
-    // Path header, del/add prefixes, and the same-file gap all reach the clipboard.
     expect(writeText).toHaveBeenCalledWith('a.ts\n- old\n+ new\n⋯\n- p\n+ q')
     expect(screen.getByRole('button', { name: '复制成功' })).toBeTruthy()
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })

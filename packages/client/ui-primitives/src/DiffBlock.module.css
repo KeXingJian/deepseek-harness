@@ -3,86 +3,24 @@
 }
 
 .body {
-  display: grid;
-  grid-template-columns: max-content max-content;
   padding: 6px 0 20px;
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
 }
 
-.line {
-  box-sizing: border-box;
-  min-height: 1lh;
-  padding: 0 22px;
-  white-space: pre;
-  grid-column: 1 / -1;
-}
-
-.linePair {
-  display: contents;
-}
-
-.cell {
-  box-sizing: border-box;
-  min-height: 1lh;
-  padding: 0 22px;
-  white-space: pre;
-}
-
-.cell[data-diff-side='new'] {
-  border-left: 0.5px solid var(--dsw-alias-border-l2);
-}
-
-.block[data-code-wrap='true'] .body {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.block[data-code-wrap='true'] .line,
-.block[data-code-wrap='true'] .cell {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .path {
+  padding: 0 22px;
   color: var(--dsw-alias-label-secondary);
   font-weight: 500;
 }
 
 .gap {
+  padding: 0 22px;
   color: var(--dsw-alias-label-tertiary);
-}
-
-.del::before {
-  content: '- ';
-}
-
-.del {
-  color: var(--dsw-alias-state-error-primary);
-  background: var(--dsw-alias-code-diff-deleted);
-  box-shadow: inset 3px 0 0 var(--dsw-alias-state-error-primary);
-}
-
-.add::before {
-  content: '+ ';
-}
-
-.add {
-  color: var(--dsw-alias-state-success-primary);
-  background: var(--dsw-alias-code-diff-added);
-  box-shadow: inset 3px 0 0 var(--dsw-alias-state-success-primary);
-}
-
-.context {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.context::before {
-  content: '  ';
 }
 
 .expand {
   display: block;
-  grid-column: 1 / -1;
   width: 100%;
   padding: 0 22px;
   border: none;
@@ -97,4 +35,114 @@
   .expand:hover {
     color: var(--dsw-alias-label-secondary);
   }
+}
+
+/* react-diff-view emits its own class names; re-theme its table layout and
+   change colors onto the dsw file-diff token palette. */
+:global(.diff) {
+  table-layout: fixed;
+  border-collapse: collapse;
+  width: 100%;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+}
+
+:global(.diff td) {
+  vertical-align: top;
+  padding: 0;
+}
+
+:global(.diff-line) {
+  line-height: 1.5;
+  font-family: var(--dsw-font-markdown-code-block);
+}
+
+:global(.diff-code) {
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  padding: 0 22px;
+}
+
+:global(.diff-code-insert) {
+  background: var(--dsw-alias-file-diff-added-bg);
+  box-shadow: inset 3px 0 0 var(--dsw-alias-file-diff-added-marker);
+}
+
+:global(.diff-code-delete) {
+  background: var(--dsw-alias-file-diff-deleted-bg);
+  box-shadow: inset 3px 0 0 var(--dsw-alias-file-diff-deleted-marker);
+}
+
+:global(.diff-code-insert .diff-code-edit) {
+  background: color-mix(in srgb, var(--dsw-alias-file-diff-added-marker) 30%, var(--dsw-alias-file-diff-added-bg));
+}
+
+:global(.diff-code-delete .diff-code-edit) {
+  background: color-mix(in srgb, var(--dsw-alias-file-diff-deleted-marker) 30%, var(--dsw-alias-file-diff-deleted-bg));
+}
+
+/* Unwrapped mode scrolls the whole table horizontally instead of folding. */
+.block[data-code-wrap='false'] :global(.diff) {
+  table-layout: auto;
+}
+
+.block[data-code-wrap='false'] :global(.diff-code) {
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Prism token palette mapped onto the shared shiki theme, so the diff's syntax
+   colors agree with every other code surface. */
+:global(.token.comment),
+:global(.token.prolog),
+:global(.token.doctype),
+:global(.token.cdata) {
+  color: var(--shiki-token-comment);
+}
+
+:global(.token.string),
+:global(.token.char),
+:global(.token.attr-value),
+:global(.token.regex) {
+  color: var(--shiki-token-string);
+}
+
+:global(.token.keyword),
+:global(.token.tag),
+:global(.token.selector),
+:global(.token.atrule) {
+  color: var(--shiki-token-keyword);
+}
+
+:global(.token.number),
+:global(.token.boolean),
+:global(.token.constant),
+:global(.token.symbol) {
+  color: var(--shiki-token-constant);
+}
+
+:global(.token.function),
+:global(.token.method) {
+  color: var(--shiki-token-function);
+}
+
+:global(.token.parameter),
+:global(.token.property),
+:global(.token.variable),
+:global(.token.class-name) {
+  color: var(--shiki-token-parameter);
+}
+
+:global(.token.operator),
+:global(.token.punctuation) {
+  color: var(--shiki-token-punctuation);
+}
+
+:global(.token.url),
+:global(.token.attr-name),
+:global(.token.builtin) {
+  color: var(--shiki-token-link);
 }
