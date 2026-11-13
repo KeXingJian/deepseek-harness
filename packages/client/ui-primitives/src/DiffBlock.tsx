@@ -45,26 +45,16 @@ export interface DiffBlockLabels extends CodeToolbarLabels {
   expand: (hidden: number) => string
 }
 
-/** A single rendered body line and its role, so the height cap slices a flat list. */
-interface DiffRow {
-  kind: 'path' | 'del' | 'add' | 'context' | 'gap'
-  text: string
+/** One aligned pair of old and new lines in a split diff. */
+interface SplitDiffRow {
+  kind: 'line'
+  oldKind: 'del' | 'context' | 'empty'
+  oldText: string
+  newKind: 'add' | 'context' | 'empty'
+  newText: string
 }
 
-/** Local exhaustiveness helper — this package does not depend on `dsh-llm`. */
-/* v8 ignore next 3 -- closed-union backstop; only reached if a row kind is forged */
-function assertNever(value: never): never {
-  throw new Error(`unreachable diff row kind: ${String(value)}`)
-}
-
-/** The dim class per row kind (path/gap chrome vs the diff's own +/- colors). */
-const ROW_CLASS: Record<DiffRow['kind'], string | undefined> = {
-  path: css.path,
-  del: css.del,
-  add: css.add,
-  context: css.context,
-  gap: css.gap,
-}
+type SplitRow = { kind: 'path'; text: string } | { kind: 'gap'; text: string } | SplitDiffRow
 
 /** Bound synchronous edit-graph search; one replacement consumes two edits. */
 const MAX_DIFF_EDIT_LENGTH = 256
@@ -100,26 +90,42 @@ export function diffTotals(diffs: DiffHunk[]): { added: number; removed: number 
   return { added, removed }
 }
 
-/**
- * Flatten local patches into rows.
- * A path header opens each new file. A `⋯` gap separates consecutive same-file
- * fragments and distant patches within a fragment.
- * @param diffs - the hunks to render.
- * @returns the body rows.
- */
-function buildRows(diffs: DiffHunk[]): DiffRow[] {
-  const rows: DiffRow[] = []
+/** Pair removed and added lines within each change run for side-by-side rendering. */
+function buildSplitRows(diffs: DiffHunk[]): SplitRow[] {
+  const rows: SplitRow[] = []
   let prevPath: string | undefined
   for (const diff of diffs) {
-    if (diff.path !== prevPath) rows.push({ kind: 'path', text: diff.path })
-    else rows.push({ kind: 'gap', text: '⋯' })
+    rows.push({ kind: diff.path !== prevPath ? 'path' : 'gap', text: diff.path !== prevPath ? diff.path : '⋯' })
     prevPath = diff.path
-    for (const [index, hunk] of localHunks(diff).entries()) {
-      if (index > 0) rows.push({ kind: 'gap', text: '⋯' })
-      for (const line of hunk.lines) {
-        const kind = line.startsWith('-') ? 'del' : line.startsWith('+') ? 'add' : 'context'
-        rows.push({ kind, text: line.slice(1) })
+    for (const [hunkIndex, hunk] of localHunks(diff).entries()) {
+      if (hunkIndex > 0) rows.push({ kind: 'gap', text: '⋯' })
+      let removed: string[] = []
+      let added: string[] = []
+      const flush = () => {
+        for (let index = 0; index < Math.max(removed.length, added.length); index++) {
+          const oldText = removed[index]
+          const newText = added[index]
+          rows.push({
+            kind: 'line',
+            oldKind: oldText === undefined ? 'empty' : 'del',
+            oldText: oldText ?? '',
+            newKind: newText === undefined ? 'empty' : 'add',
+            newText: newText ?? '',
+          })
+        }
+        removed = []
+        added = []
       }
+      for (const line of hunk.lines) {
+        const text = line.slice(1)
+        if (line.startsWith('-')) removed.push(text)
+        else if (line.startsWith('+')) added.push(text)
+        else {
+          flush()
+          rows.push({ kind: 'line', oldKind: 'context', oldText: text, newKind: 'context', newText: text })
+        }
+      }
+      flush()
     }
   }
   return rows
@@ -141,32 +147,34 @@ function contentLines(text: string): string[] {
 }
 
 /**
- * Copy the full local diff, including folded rows: removed/added lines have
- * `- `/`+ ` prefixes, context has two spaces, and paths and gaps stay verbatim.
- * @param rows - the flattened body rows.
+ * Copy the full local diff, including folded rows, with paths, context, and change prefixes.
+ * @param diffs - the file changes to copy.
  * @returns the diff as plain text.
  */
-function copyText(rows: DiffRow[]): string {
-  return rows.map((row) => {
-    switch (row.kind) {
-      case 'del': return `- ${row.text}`
-      case 'add': return `+ ${row.text}`
-      case 'context': return `  ${row.text}`
-      case 'path': return row.text
-      case 'gap': return row.text
-      /* v8 ignore next -- closed-union backstop; only reached if a row kind is forged */
-      default: return assertNever(row.kind)
+function copyText(diffs: DiffHunk[]): string {
+  const lines: string[] = []
+  let prevPath: string | undefined
+  for (const diff of diffs) {
+    lines.push(diff.path !== prevPath ? diff.path : '⋯')
+    prevPath = diff.path
+    for (const [index, hunk] of localHunks(diff).entries()) {
+      if (index > 0) lines.push('⋯')
+      for (const line of hunk.lines) {
+        if (line.startsWith('-')) lines.push(`- ${line.slice(1)}`)
+        else if (line.startsWith('+')) lines.push(`+ ${line.slice(1)}`)
+        else if (!line.startsWith('\\')) lines.push(`  ${line.slice(1)}`)
+      }
     }
-  }).join('\n')
+  }
+  return lines.join('\n')
 }
 
 /**
- * Render a file mutation as an inline diff surface.
+ * Render a file mutation as an aligned two-column diff without inferred file line numbers.
  * @param props - see {@link DiffBlockProps}.
  * @returns the diff block element.
  */
 export function DiffBlock({ diffs, labels, maxLines = DEFAULT_DIFF_MAX_LINES, className }: DiffBlockProps) {
-  const rows = useMemo(() => buildRows(diffs), [diffs])
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [wrapped, setWrapped] = useState(false)
@@ -175,34 +183,46 @@ export function DiffBlock({ diffs, labels, maxLines = DEFAULT_DIFF_MAX_LINES, cl
 
   const onCopy = useCallback(() => {
     if (copied) return
-    void writeClipboard(copyText(rows)).then((ok) => {
+    void writeClipboard(copyText(diffs)).then((ok) => {
       if (!ok) return
       setCopied(true)
       window.setTimeout(() => { setCopied(false) }, 1000)
     })
-  }, [copied, rows])
+  }, [copied, diffs])
 
   const onToggle = useCallback(() => { setExpanded(value => !value) }, [])
 
-  if (rows.length === 0) return null
+  const splitRows = useMemo(() => buildSplitRows(diffs), [diffs])
+  if (splitRows.length === 0) return null
 
-  const hidden = rows.length - maxLines
+  // The cap counts aligned rows, so one replacement occupies one visible row.
+  const hidden = splitRows.length - maxLines
   const capped = hidden > 0 && !expanded
-  // Same split arithmetic as TerminalBlock and the TUI transcript's collapsed
-  // card, so a body's head and tail slices agree across the front ends.
   const headLines = Math.ceil(maxLines / 2)
   const tailLines = maxLines - headLines
-  const head = capped ? rows.slice(0, headLines) : rows
-  const tail = capped ? rows.slice(rows.length - tailLines) : []
+  const head = capped ? splitRows.slice(0, headLines) : splitRows
+  const tail = capped ? splitRows.slice(splitRows.length - tailLines) : []
+  const renderRows = (visible: SplitRow[], offset: number) => visible.map((row, index) => {
+    const key = offset + index
+    if (row.kind === 'path') return <div key={key} className={clsx(css.line, css.path)}>{row.text}</div>
+    if (row.kind === 'gap') return <div key={key} className={clsx(css.line, css.gap)}>{row.text}</div>
+    if (row.oldKind === 'context') {
+      return <div key={key} className={clsx(css.line, css.context)} data-diff-side="context">{row.oldText}</div>
+    }
+    return (
+      <div key={key} className={css.linePair}>
+        <div className={clsx(css.cell, css[row.oldKind])} data-diff-side="old">{row.oldText}</div>
+        <div className={clsx(css.cell, css[row.newKind])} data-diff-side="new">{row.newText}</div>
+      </div>
+    )
+  })
 
   return (
     <div className={clsx(cardCss.card, css.block, className)} data-diff="" data-code-wrap={wrapped}>
       <CodeToolbar lang={language} labels={labels} copyLabel={labels.copy} copiedLabel={labels.copied}
         copied={copied} wrapped={wrapped} onCopy={onCopy} onWrap={() => { setWrapped(value => !value) }} />
       <div className={css.body}>
-        {head.map((row, index) => (
-          <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
-        ))}
+        {renderRows(head, 0)}
         {hidden > 0 && (
           <FoldToggle
             className={css.expand}
@@ -212,9 +232,7 @@ export function DiffBlock({ diffs, labels, maxLines = DEFAULT_DIFF_MAX_LINES, cl
             onToggle={onToggle}
           />
         )}
-        {tail.map((row, index) => (
-          <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
-        ))}
+        {renderRows(tail, splitRows.length - tail.length)}
       </div>
     </div>
   )

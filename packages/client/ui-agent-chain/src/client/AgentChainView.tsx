@@ -5,6 +5,8 @@
  */
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactElement } from 'react'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChainCard } from '@deepseek-ai/dsh-agent-activity'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
@@ -52,6 +54,14 @@ export interface AgentChainViewProps {
  * @param props.t - 评审链翻译器。
  * @returns 显示相对路径的文件按钮。
  */
+function LocatorPreview({ bar, children }: {
+  bar: ChainLocatorBar
+  children: ReactElement
+}) {
+  const label = bar.detail === undefined ? bar.title : `${bar.title}\n${bar.detail}`
+  return <Tooltip label={label} side="left" portal>{children}</Tooltip>
+}
+
 function FileButton({ path, label, openFile, t }: {
   path: string
   label: string
@@ -214,17 +224,17 @@ function ChainLocator({ bars, active, onJump, t }: {
   return (
     <nav ref={rail} className={css.locator} aria-label={t('locator.aria')}>
       {bars.map((bar, index) => (
-        <button
-          key={bar.id}
-          type="button"
-          className={css.locatorBar}
-          data-kind={bar.kind}
-          data-active={index === active ? '' : undefined}
-          aria-current={index === active ? 'location' : undefined}
-          aria-label={`${t('locator.jump')} ${bar.title}`}
-          title={bar.title}
-          onClick={() => { onJump(bar.index, bar.id) }}
-        />
+        <LocatorPreview key={bar.id} bar={bar}>
+          <button
+            type="button"
+            className={css.locatorBar}
+            data-kind={bar.kind}
+            data-active={index === active ? '' : undefined}
+            aria-current={index === active ? 'location' : undefined}
+            aria-label={`${t('locator.jump')} ${bar.title}`}
+            onClick={() => { onJump(bar.index, bar.id) }}
+          />
+        </LocatorPreview>
       ))}
     </nav>
   )
@@ -241,7 +251,7 @@ export function AgentChainView({ sessionId, useSessions, useChain, t, openFile, 
   const label = useMemo<ChainPathLabel>(() => path => relativizeToCwd(path, cwd), [cwd])
   const [merged, setMerged] = useState(false)
   const [expanded, setExpanded] = useState<readonly string[]>([])
-  const [reconHidden, setReconHidden] = useState(false)
+  const [reconHidden, setReconHidden] = useState(true)
   const [list, setList] = useState<HTMLOListElement | null>(null)
   const [jumpTo, setJumpTo] = useState<string | null>(null)
   const sourceCards = merged ? chain.mergedCards : chain.cards

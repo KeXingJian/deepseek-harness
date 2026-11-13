@@ -17,6 +17,8 @@ export interface ChainLocatorBar {
   readonly kind: ChainKind
   /** 卡片的本地化标题，用于无障碍名称与悬停提示。 */
   readonly title: string
+  /** 卡片引用的已记录变更说明；用于定位条悬停预览。 */
+  readonly detail: string | undefined
   /** 该卡片在顶层列表中的下标；卡片尚未渲染时用它先渲染出来。 */
   readonly index: number
 }
@@ -34,7 +36,7 @@ const GUIDED_KINDS: ReadonlySet<ChainKind> = new Set<ChainKind>(['prompt', 'chan
  */
 function isGuided(card: ChainCard): boolean {
   if (GUIDED_KINDS.has(card.kind)) return true
-  return (card.children ?? []).some(isGuided)
+  return (card.children ?? []).some(child => child.kind === 'change')
 }
 
 /**
@@ -49,9 +51,25 @@ export function locatorBars(
   t: ChainTranslate,
   label: ChainPathLabel,
 ): readonly ChainLocatorBar[] {
-  return cards.flatMap((card, index) => (isGuided(card)
-    ? [{ id: card.id, kind: card.kind, title: cardTitle(card, t, label), index }]
-    : []))
+  return cards.flatMap((card, index) => {
+    if (!isGuided(card)) return []
+    const childChanges = (card.children ?? []).filter(child => child.kind === 'change')
+    const details = childChanges.map((child) => {
+      const note = child.meta?.['note']
+      return [cardTitle(child, t, label), typeof note === 'string' ? note : undefined].filter(Boolean).join(' — ')
+    })
+    return [{
+      id: card.id,
+      kind: card.kind,
+      title: cardTitle(card, t, label),
+      detail: details.length > 0
+        ? details.join('\n')
+        : card.kind === 'change' && typeof card.meta?.['note'] === 'string'
+          ? card.meta['note']
+          : undefined,
+      index,
+    }]
+  })
 }
 
 /**

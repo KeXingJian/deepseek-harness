@@ -230,6 +230,15 @@ describe('nested action cards', () => {
 describe('recorded diffs', () => {
   const HUNK = { path: 'src/b.ts', oldText: 'a', newText: 'b' }
 
+  it('carries the current turn intent on its change cards', () => {
+    const result = chainFromSpans([
+      span(0, 'turn', 'turn:1', { attributes: { intent: 'Finish the route migration' } }),
+      span(0.5, 'step', 'step:1', { attributes: { thinking: 'Update the route handler' } }),
+      tool(1, 'edit', { path: 'src/route.ts' }),
+    ])
+    expect(changeCards(result)[0]?.meta).toMatchObject({ turnIntent: 'Finish the route migration' })
+  })
+
   it('carries the diff recorded for a change call', () => {
     const result = chainFromSpans([tool(1, 'edit', { path: 'src/b.ts', callId: 'call-1' })], '', {
       'call-1': [HUNK],

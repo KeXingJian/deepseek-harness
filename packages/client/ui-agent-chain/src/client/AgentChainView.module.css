@@ -4,6 +4,7 @@
 
 .root {
   --chain-rail-width: 56px;
+  --chain-font-scale: 1.2;
   /* 定位条与卡片列之间的间距；卡片区的宽度上限也按它算。 */
   --chain-gap: 8px;
   /* 读者真正看得见的带：滚动容器高度扣掉贴底的输入区，两者都由会话外壳发布。
@@ -28,6 +29,13 @@
   padding: 16px 12px 24px;
   gap: 8px;
   color: var(--dsw-alias-label-primary);
+}
+
+/* Every chain text role scales together; line heights scale with the selected font size. */
+.root {
+  font-size: calc(14px * var(--chain-font-scale));
+  line-height: calc(20px * var(--chain-font-scale));
+  font-weight: 400;
 }
 
 /* 时间线与勘察开关属于同一组，窄列时自然换行。 */
@@ -57,7 +65,7 @@
   height: 24px;
   color: var(--dsw-alias-label-tertiary);
   background: transparent;
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
   gap: 2px;
   cursor: pointer;
 }
@@ -139,6 +147,7 @@
 }
 
 .locatorBar {
+  position: relative;
   flex: none;
   width: 40px;
   height: 8px;
@@ -192,7 +201,7 @@
   corner-shape: round;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
   cursor: pointer;
 }
 
@@ -215,6 +224,10 @@
 
   .locator {
     display: none;
+  }
+
+  .locatorPreview {
+    right: 12px;
   }
 }
 
@@ -297,6 +310,27 @@
   --card-tint: 7%;
 }
 
+.turnIntentLabel {
+  color: var(--dsw-alias-label-secondary);
+  font-size: calc(11px * var(--chain-font-scale));
+  line-height: calc(16px * var(--chain-font-scale));
+}
+
+.turnIntent {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 8px 18px;
+  padding: 8px 12px;
+  gap: 2px;
+  border-inline-start: 3px solid var(--dsw-alias-state-done-primary);
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-done-primary) 10%, transparent);
+  font-weight: 400;
+  font-size: calc(13px * var(--chain-font-scale));
+  line-height: calc(20px * var(--chain-font-scale));
+}
+
 /* 勘察是背景工作，压低到灰阶，标题也退到次级墨色。 */
 .card[data-kind='recon'] {
   --card-accent: var(--dsw-alias-label-tertiary);
@@ -371,8 +405,8 @@
   corner-shape: round;
   color: color-mix(in srgb, var(--card-accent) 55%, var(--dsw-alias-label-primary));
   background-color: color-mix(in srgb, var(--card-accent) 12%, transparent);
-  font-size: 11px;
-  line-height: 17px;
+  font-size: calc(11px * var(--chain-font-scale));
+  line-height: calc(17px * var(--chain-font-scale));
   font-weight: 500;
   white-space: nowrap;
 }
@@ -401,13 +435,13 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-primary);
-  font: var(--dsw-font-xs-13);
+  font: calc(13px * var(--chain-font-scale)) / calc(20px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 /* 人的原话和收尾结论比叙述更重，其余类别保持同一字重。 */
 .card[data-kind='prompt'] .title,
 .card[data-kind='result'] .title {
-  font: var(--dsw-font-xs-strong-13);
+  font: 500 calc(13px * var(--chain-font-scale)) / calc(20px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 /* 探查是背景工作，标题降到次级墨色；状态色仍覆盖它。 */
@@ -426,7 +460,7 @@
 .repeat {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 /* 行动计数对齐类别标签，读作这段思考的下一行。 */
@@ -436,7 +470,7 @@
   padding-left: 18px;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 .toggle {
@@ -503,7 +537,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   margin: 0;
   gap: 2px 8px;
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 .metaLabel {
@@ -522,7 +556,7 @@
   flex-direction: column;
   min-width: 0;
   gap: 4px;
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 .evidenceList {
@@ -541,7 +575,7 @@
   min-width: 0;
   gap: 6px;
   color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 .evidenceButton {
@@ -567,14 +601,14 @@
 .evidenceSeq {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 .evidenceName {
   min-width: 0;
   overflow-wrap: anywhere;
   color: inherit;
-  font: var(--dsw-font-xxs-12);
+  font: calc(12px * var(--chain-font-scale)) / calc(18px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 /* 文件行会在会话旁打开预览，而不是作为纯文本呈现。 */
@@ -607,7 +641,7 @@
   margin: 32px 0;
   text-align: center;
   color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xs-13);
+  font: calc(13px * var(--chain-font-scale)) / calc(20px * var(--chain-font-scale)) var(--dsw-font-family);
 }
 
 @media (max-width: 560px) {

@@ -305,6 +305,7 @@ function changeCard(span: ActivitySpan, diffs: ChangeDiffs, context: ChangeConte
   const recordedField = recorded === undefined ? {} : { diffs: recorded }
   const explanation = changeNote(path, context)
   const noteField = explanation === undefined ? {} : { note: explanation.note, noteFrom: explanation.noteFrom }
+  const intentField = context.intent === undefined ? {} : { turnIntent: context.intent }
   if (attrString(span, 'op') === 'delete' || span.name === 'delete') {
     return {
       id: `change:${span.seq}`,
@@ -314,7 +315,7 @@ function changeCard(span: ActivitySpan, diffs: ChangeDiffs, context: ChangeConte
       status: 'error',
       evidenceSeqs: [span.seq],
       ...recordedField,
-      meta: { path, op: 'delete', ...noteField },
+      meta: { path, op: 'delete', ...noteField, ...intentField },
     }
   }
   const created = attrString(span, 'op') === 'create'
@@ -326,7 +327,7 @@ function changeCard(span: ActivitySpan, diffs: ChangeDiffs, context: ChangeConte
     status: 'ok',
     evidenceSeqs: [span.seq],
     ...recordedField,
-    meta: { path, op: created ? 'create' : 'update', ...noteField },
+    meta: { path, op: created ? 'create' : 'update', ...noteField, ...intentField },
   }
 }
 
@@ -653,7 +654,11 @@ function mergeChanges(cards: readonly ChainCard[]): ChainCard[] {
       repeat: (current.repeat ?? 1) + 1,
       evidenceSeqs: [...current.evidenceSeqs, ...card.evidenceSeqs],
       ...(merged.length === 0 ? {} : { diffs: merged }),
-      ...(notes.note === undefined ? {} : { meta: { ...current.meta, ...notes } }),
+      meta: {
+        ...current.meta,
+        ...(card.meta?.['turnIntent'] === undefined ? {} : { turnIntent: card.meta['turnIntent'] }),
+        ...(notes.note === undefined ? {} : notes),
+      },
     }
   }
   return out

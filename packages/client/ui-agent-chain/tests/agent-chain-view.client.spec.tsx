@@ -92,6 +92,19 @@ describe('waiting state', () => {
 })
 
 describe('card rows', () => {
+  it('puts the recorded turn intent above a change card', () => {
+    renderView([card({
+      kind: 'change',
+      title: { copy: 'change', op: 'update', path: 'src/a.ts' },
+      meta: { turnIntent: 'Complete the route migration' },
+    })])
+    const row = document.querySelector<HTMLElement>('[data-kind="change"]')!
+    const intent = within(row).getByText('Complete the route migration')
+    expect(intent.parentElement?.className).toContain('turnIntent')
+    const head = row.querySelector('[class*="_head_"]')!
+    expect(intent.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders one row per card with its localized title, repeat, and status', () => {
     renderView([
       intent('inspect the catalog module'),
@@ -112,7 +125,7 @@ describe('card rows', () => {
     expect(screen.queryByRole('button', { name: 'Show evidence' })).toBeNull()
   })
 
-  it('gives every card kind its own glyph and visible label', () => {
+  it('gives every visible card kind its own glyph and label', () => {
     const titles: Readonly<Record<ChainCard['kind'], ChainTitle>> = {
       prompt: { copy: 'prompt', text: 'fix the redirect' },
       thinking: { copy: 'thinking', text: 'start with the router' },
@@ -127,11 +140,15 @@ describe('card rows', () => {
     renderView(kinds.map((kind, index) => card({ id: `${kind}:${String(index)}`, kind, title: titles[kind] })))
     const glyphs = kinds.map((kind) => {
       const row = document.querySelector(`[data-kind="${kind}"]`)
+      if (kind === 'recon') {
+        expect(row).toBeNull()
+        return undefined
+      }
       expect(row).toBeTruthy()
       return row?.querySelector('svg')?.getAttribute('data-icon')
     })
-    expect(new Set(glyphs).size).toBe(kinds.length)
-    for (const glyph of glyphs) expect(glyph).toMatch(/^dsw-icon-/)
+    expect(new Set(glyphs.filter((glyph): glyph is string => glyph !== undefined)).size).toBe(kinds.length - 1)
+    for (const glyph of glyphs.filter((value): value is string => value !== undefined)) expect(glyph).toMatch(/^dsw-icon-/)
   })
 })
 
@@ -218,15 +235,15 @@ describe('nested action cards', () => {
   it('renders the step actions as child cards without expanding the parent', () => {
     renderView([thinkingWithChildren()])
     expect(screen.getByText('src/a.ts modified')).toBeTruthy()
-    expect(screen.getByText('1 files')).toBeTruthy()
+    expect(screen.getByText('read 1 files · changed 1 files')).toBeTruthy()
     expect(screen.getByText('start with the router')).toBeTruthy()
   })
 
   it('expands a child card on its own', () => {
     renderView([thinkingWithChildren()])
-    // Parent, change child, and recon child each own a toggle.
+    // Parent and visible change child each own a toggle; recon is hidden by default.
     const toggles = screen.getAllByRole('button', { name: 'Show evidence' })
-    expect(toggles).toHaveLength(3)
+    expect(toggles).toHaveLength(2)
     fireEvent.click(toggles[1] as HTMLElement)
     expect(screen.getByText('const a = 1')).toBeTruthy()
     expect(screen.getByText('const a = 2')).toBeTruthy()
@@ -303,20 +320,19 @@ describe('timeline controls', () => {
 describe('recon visibility', () => {
   const recon = card({ id: 'recon:2', kind: 'recon', title: { copy: 'recon', files: 2, searches: 1 } })
 
-  it('shows recon cards by default and hides them on request', () => {
+  it('hides recon cards by default and shows them on request', () => {
     renderView([intent('inspect the catalog module'), recon])
-    const toggle = screen.getByRole('button', { name: 'Hide recon' })
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
-    expect(screen.getByText('2 files, 1 searches')).toBeTruthy()
-    fireEvent.click(toggle)
-    expect(screen.getByRole('button', { name: 'Show recon' }).getAttribute('aria-pressed')).toBe('true')
+    const toggle = screen.getByRole('button', { name: 'Show recon' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(screen.queryByText('2 files, 1 searches')).toBeNull()
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Hide recon' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText('2 files, 1 searches')).toBeTruthy()
     expect(screen.getByText('inspect the catalog module')).toBeTruthy()
   })
 
   it('reports an empty list when hiding recon leaves nothing', () => {
     renderView([recon])
-    fireEvent.click(screen.getByRole('button', { name: 'Hide recon' }))
     expect(screen.getByText('Nothing matches this filter')).toBeTruthy()
   })
 })
@@ -342,6 +358,24 @@ describe('card locator', () => {
     Element.prototype.scrollIntoView = scrollIntoView
   })
   afterEach(() => { scrollIntoView.mockClear() })
+
+  it('provides a localized locator tooltip on hover and keyboard focus', async () => {
+    const cards = [card({
+      id: 'prompt:0', kind: 'prompt', title: { copy: 'prompt', text: 'Repair the route and keep tests passing' },
+    }), card({
+      id: 'change:1', kind: 'change', title: { copy: 'change', op: 'update', path: 'src/a.ts' },
+      meta: { note: 'Update the route handler' },
+    })]
+    renderView(cards)
+    const marks = screen.getAllByRole('button', { name: /Jump to/ })
+    const promptMark = marks[0] as HTMLElement
+    const changeMark = marks[1] as HTMLElement
+    fireEvent.pointerEnter(promptMark)
+    expect(await screen.findByRole('tooltip')).toBeTruthy()
+    fireEvent.pointerLeave(promptMark)
+    fireEvent.focus(changeMark)
+    expect(await screen.findByRole('tooltip')).toBeTruthy()
+  })
 
   it('keeps a change between two user prompts in the locator rail', () => {
     renderView([

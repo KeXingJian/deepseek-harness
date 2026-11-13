@@ -295,6 +295,8 @@ export function detailRows(card: ChainCard, t: ChainTranslate, label: ChainPathL
   if (thinking !== undefined) rows.push({ label: t('meta.thinking'), value: thinking })
   const path = metaString(card.meta, 'path')
   if (path !== undefined) rows.push({ label: t('meta.path'), value: label(path), file: path })
+  const turnIntent = metaString(card.meta, 'turnIntent')
+  if (turnIntent !== undefined) rows.push({ label: t('meta.noteTurn'), value: turnIntent })
   const note = metaString(card.meta, 'note')
   // 来源缺失时按本步上下文标注：一条说明点没点名该文件由投影决定，展示层不重复推断。
   const noteKey = NOTE_KEYS[metaString(card.meta, 'noteFrom') ?? ''] ?? 'meta.noteStep'

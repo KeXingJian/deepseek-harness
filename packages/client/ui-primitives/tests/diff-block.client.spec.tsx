@@ -18,7 +18,14 @@ beforeEach(() => {
 })
 
 function bodyRows(container: HTMLElement): string[] {
-  return [...container.querySelectorAll('[class*="_line_"]')].map(row => row.textContent ?? '')
+  return [...container.querySelectorAll('[data-diff-side="context"], [class*="_path_"], [class*="_gap_"], [class*="_linePair_"]')]
+    .flatMap((row) => {
+      if (row.matches('[class*="_linePair_"]')) {
+        return [row.querySelector('[data-diff-side="old"]')?.textContent ?? '',
+          row.querySelector('[data-diff-side="new"]')?.textContent ?? ''].filter(text => text.length > 0)
+      }
+      return [row.textContent ?? '']
+    })
 }
 
 function changeRows(container: HTMLElement): string[] {
@@ -40,12 +47,22 @@ describe('DiffBlock structure', () => {
     expect(container.querySelectorAll('[class*="_add_"]').length).toBe(2)
   })
 
-  it('renders an edit as a removed block above an added block', () => {
+  it('aligns a replaced line across the old and new columns', () => {
     const diffs: DiffHunk[] = [{ path: 'a.ts', oldText: 'old', newText: 'new' }]
     const { container } = render(<DiffBlock diffs={diffs} />)
     expect(container.querySelectorAll('[class*="_del_"]').length).toBe(1)
     expect(container.querySelectorAll('[class*="_add_"]').length).toBe(1)
-    expect(changeRows(container)).toEqual(['old', 'new'])
+    expect([...container.querySelectorAll('[data-diff-side]')].map(cell => cell.textContent)).toEqual(['old', 'new'])
+    expect(container.querySelectorAll('[class*="_linePair_"]')).toHaveLength(1)
+    expect(container.querySelector('[data-line-number]')).toBeNull()
+  })
+
+  it('keeps inserted and deleted rows in their original side only', () => {
+    const { container } = render(<DiffBlock diffs={[{ path: 'a.ts', oldText: 'before', newText: 'before\ninserted' }]} />)
+    expect([...container.querySelectorAll('[data-diff-side]')].map(cell => [cell.getAttribute('data-diff-side'), cell.textContent])).toEqual([
+      ['context', 'before'], ['old', ''], ['new', 'inserted'],
+    ])
+    expect(container.querySelector('[data-line-number]')).toBeNull()
   })
 
   it('opens a same-file second hunk with a gap instead of repeating the path', () => {

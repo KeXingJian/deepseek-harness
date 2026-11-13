@@ -76,8 +76,8 @@ describe('locatorBars', () => {
       { ...card('prompt:0', 'prompt', 'fix the redirect'), evidenceSeqs: [1] },
     ], t, path => path)
     expect(bars).toEqual([
-      { id: 'change:2', kind: 'change', title: 'a.ts modified', index: 0 },
-      { id: 'prompt:0', kind: 'prompt', title: 'fix the redirect', index: 2 },
+      { id: 'change:2', kind: 'change', title: 'a.ts modified', detail: undefined, index: 0 },
+      { id: 'prompt:0', kind: 'prompt', title: 'fix the redirect', detail: undefined, index: 2 },
     ])
   })
 
@@ -104,14 +104,16 @@ describe('locatorBars', () => {
   it('keeps a thinking card that folds out a change and drops one that folds out only recon', () => {
     const withChange: ChainCard = {
       ...card('thinking:1', 'thinking', 'start with the router'),
-      children: [card('change:2', 'change', 'a.ts modified')],
+      children: [{ ...card('change:2', 'change', 'a.ts modified'), meta: { note: 'Route handling needed a direct fix' } }],
     }
     const withoutChange: ChainCard = {
       ...card('thinking:3', 'thinking', 'keep reading'),
       children: [card('recon:4', 'recon', '2 files')],
     }
     const bars = locatorBars([withChange, withoutChange], t, path => path)
-    expect(bars).toEqual([{ id: 'thinking:1', kind: 'thinking', title: 'start with the router', index: 0 }])
+    expect(bars).toEqual([{
+      id: 'thinking:1', kind: 'thinking', title: 'start with the router', detail: 'a.ts modified — Route handling needed a direct fix', index: 0,
+    }])
   })
 
   it('guides nothing in a chain without prompts or changes', () => {
